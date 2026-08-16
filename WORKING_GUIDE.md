@@ -10,10 +10,12 @@ Sentetik veriyle çalışıyor. Ground truth'u sen ürettiğin için offline eva
 
 | Dosya | Okuyucu | İşlevi |
 |---|---|---|
-| `README.md` | Sen | Kurulum, çalışma döngüsü, Claude Code çıktısını nasıl denetleyeceğin |
+| `WORKING_GUIDE.md` (bu dosya) | Sen | Kurulum, çalışma döngüsü, Claude Code çıktısını nasıl denetleyeceğin |
 | `PROMPTS.md` | Sen | Claude Code'a kopyala-yapıştır vereceğin komutlar |
 | `CLAUDE.md` | Claude Code | Her oturumda otomatik okunan kalıcı kurallar |
 | `SPEC.md` | Claude Code | Teknik spesifikasyon — tasarım kararları, sektör parametreleri, milestone'lar |
+| `README.md` | Dışarıdan bakan | Projenin İngilizce tanıtımı — proje bittikten sonra yazıldı |
+| `REHBER.md` · `DATA.md` | Dışarıdan bakan | İlk kez bakan için giriş · veri sözlüğü |
 
 `SPEC.md` çalıştırılabilir bir şey değil, referans dokümandır. Sen `PROMPTS.md`'den komut verirsin, Claude Code `CLAUDE.md` + `SPEC.md` okuyarak uygular.
 
@@ -26,7 +28,7 @@ mkdir pharma-offer-engine && cd pharma-offer-engine
 git init
 
 # Dört dosyayı repo köküne kopyala
-# README.md  PROMPTS.md  CLAUDE.md  SPEC.md
+# WORKING_GUIDE.md  PROMPTS.md  CLAUDE.md  SPEC.md
 
 git add . && git commit -m "spec + guidance"
 
