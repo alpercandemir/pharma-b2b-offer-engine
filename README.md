@@ -132,6 +132,19 @@ Two scale profiles are available in [`config/profiles/`](config/profiles/):
 - `full` — 200 pharmacies × 300 SKUs × 104 weeks. This is the profile every reported number uses.
 - `fast` — 60 × 100 × 104. For sweeps, iteration and tests. **It does not satisfy the M1 exit criterion**; never quote a headline number from it.
 
+### Looking at the data first
+
+You do not need to install anything to see what the simulator produces. A complete `fast` world
+(~400 KB) is committed at [`data/fast/`](data/fast/), and [`DATA.md`](DATA.md) documents all 19 tables
+with real rows from that sample — what each column means, how lots and expiry are tracked, and where
+the observable/latent boundary sits.
+
+That boundary is the design idea worth understanding before reading anything else:
+`data/*/observable/` is what a real wholesaler would have in its systems, `data/*/ground_truth/` is
+what is actually true. Models may only read the former; only `eval/oracle.py` reads the latter. In the
+committed sample, we see 35% of unit demand — the rest goes to competitors and is invisible to every
+model in the repository.
+
 ## Running the engine
 
 Note: CLI flags and module internals are in Turkish (`--kosu` = run, `--asama` = stage, `--profil` =
@@ -197,7 +210,8 @@ The full suite takes about 8 minutes.
 sim/          Synthetic world — the ground truth the models never see
               world.py, events.py, response.py, rollout.py, lots.py, pharmacies.py, products.py
 data/         What the world exposes: observable/ (orders, shipments, lots, prices)
-              vs ground_truth/ (latent SOW, true consumption, real events)
+              vs ground_truth/ (latent SOW, true consumption, real events).
+              data/fast is committed as a sample; see DATA.md
 features/     Point-in-time feature builders with a leakage guard
 models/       depletion.py (hazard), uplift.py (T- and X-learner)
 policy/       candidates.py, constraints.py (hard veto), scorer.py, allocate.py (LP), bandit.py
@@ -305,6 +319,7 @@ promotion restrictions, İTS serialization rules, and the actual mechanics of ex
 | `README.md` | Everyone | This file — what, why, how to run, what is left |
 | [`SPEC.md`](SPEC.md) | Claude Code | Technical specification: design decisions, domain parameters, milestone definitions |
 | [`CLAUDE.md`](CLAUDE.md) | Claude Code | Standing rules, read at the start of every session |
+| [`DATA.md`](DATA.md) | Everyone | Data dictionary — all 19 tables with real rows from the committed sample |
 | [`TUNING.md`](TUNING.md) | Operators | The knob catalogue — 354 knobs, mechanism, ranges, symptoms, diagnostics |
 | [`WORKING_GUIDE.md`](WORKING_GUIDE.md) | Maintainer | Session workflow and the audit checklist for reviewing generated code |
 | [`PROMPTS.md`](PROMPTS.md) | Maintainer | Copy-paste milestone commands |

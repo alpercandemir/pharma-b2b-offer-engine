@@ -12,14 +12,13 @@ __pycache__/
 # Claude Code local state
 .claude/
 
-# Agent-facing instruction files (kept locally, not published)
-CLAUDE.md
-PROMPTS.md
-
-# Generated worlds and run artifacts.
-# Every run is seeded and reproducible:
+# Generated worlds. data/fast is committed as a browsable sample (see DATA.md);
+# everything else regenerates deterministically from seed:
 #   uv run python -m scripts.generate_world --profil full --kosu full
-data/
+data/*
+!data/fast/
+
+# Run artifacts: reference runs and ~56 sweep outputs, all reproducible
 experiments/runs/
 
 # Scratch output

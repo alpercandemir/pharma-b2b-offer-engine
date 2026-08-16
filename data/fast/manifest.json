@@ -1,0 +1,39 @@
+{
+  "profil": "fast",
+  "config_hash": "3c741cfdcf42144a",
+  "dunya_hash": "983a2a73aaa9467e",
+  "temel_seed": 20260812,
+  "knob_gecersiz_kilma": {},
+  "eczane_sayisi": 60,
+  "sku_sayisi": 100,
+  "hafta_sayisi": 104,
+  "kosu_suresi_sn": 0.32,
+  "seed_tohumlari": {
+    "dunya_dongusu": 11568483757614467892,
+    "urun_evreni": 14515946411459983937,
+    "eczane_evreni": 15532058857409814587,
+    "olaylar": 4645993896284498965
+  },
+  "satir_sayilari": {
+    "urunler": 100,
+    "eczaneler": 60,
+    "takvim": 104,
+    "olaylar": 26,
+    "siparisler": 4568,
+    "sevkiyat_satirlari": 4548,
+    "stok_lotlari": 873,
+    "depo_stok_haftalik": 10400,
+    "imhalar": 844,
+    "iadeler": 713,
+    "urun_fiyat_haftalik": 10400,
+    "makro_haftalik": 104,
+    "latent_urun": 100,
+    "latent_eczane": 60,
+    "hucre_haftalik": 107536,
+    "rakip_siparisleri": 8588,
+    "sow_haftalik": 6240,
+    "olaylar_gercek": 26,
+    "tukenme_olaylari": 2602
+  },
+  "yazilma_zamani_utc": "2026-08-14T08:15:36.333051+00:00"
+}
