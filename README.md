@@ -9,9 +9,40 @@ This is a **learning substrate, not a production system.** It runs entirely on s
 the whole point is that the ground truth is known: you can check whether your off-policy evaluation was
 telling the truth, which is a luxury you never have in the real world.
 
+## Try it in one minute
+
+Needs only Python 3.11+ and [`uv`](https://docs.astral.sh/uv/). No database, no API key, no services.
+
+```bash
+git clone https://github.com/alpercandemir/pharma-b2b-offer-engine && cd pharma-b2b-offer-engine
+```
+
+```bash
+uv sync --python 3.12
+```
+
+```bash
+uv run python -m scripts.generate_world --profil full --kosu full && uv run python -m scripts.verify_m1 --kosu full
+```
+
+Builds a 200-pharmacy × 300-SKU × 104-week world in 3 seconds and verifies it in 7, printing
+`SONUC: 13/13 gecti` — the exact numbers in [`reports/m1.md`](reports/m1.md), because generation is
+seeded and reproducible.
+
+Then turn a knob and watch a policy change its mind (~30 seconds):
+
+```bash
+uv run python -m experiments.sweep --knob politika.kisit.eczane_haftalik_teklif_tavani --values 1,5,20 --seeds 2 --asama m4 --profil fast
+```
+
+Full details in [Getting started](#getting-started) · what the data looks like in [`DATA.md`](DATA.md) ·
+what each knob does in [`TUNING.md`](TUNING.md).
+
 ---
 
 ## Table of contents
+
+- [Try it in one minute](#try-it-in-one-minute)
 
 - [What it solves](#what-it-solves)
 - [Design decisions](#design-decisions)
@@ -105,19 +136,15 @@ No notebooks, by design. Everything is an executable script plus config.
 
 ## Getting started
 
-**Requirements:** Python 3.11+ and `uv`.
+**Requirements:** Python 3.11+ and [`uv`](https://docs.astral.sh/uv/). Nothing else — no database, no
+API key, no services.
+
+Three commands take you from a clone to a reproduced result. The whole thing is under a minute after
+dependencies are installed:
 
 ```bash
 uv sync --python 3.12
 ```
-
-Optional, only needed for live LLM calls:
-
-```bash
-uv sync --extra llm
-```
-
-Then generate the world and verify the baseline:
 
 ```bash
 uv run python -m scripts.generate_world --profil full --kosu full
@@ -127,23 +154,43 @@ uv run python -m scripts.generate_world --profil full --kosu full
 uv run python -m scripts.verify_m1 --kosu full
 ```
 
-Two scale profiles are available in [`config/profiles/`](config/profiles/):
+The last command prints a 13-row table ending in `SONUC: 13/13 gecti` and writes eight plots to
+`reports/figures/m1/`. Those are the exact numbers in [`reports/m1.md`](reports/m1.md) — world
+generation is seeded, so you get the same world the reports were written against, byte for byte.
 
-- `full` — 200 pharmacies × 300 SKUs × 104 weeks. This is the profile every reported number uses.
-- `fast` — 60 × 100 × 104. For sweeps, iteration and tests. **It does not satisfy the M1 exit criterion**; never quote a headline number from it.
+The timings below were measured on a fresh clone on an Apple Silicon Mac. World generation is **3
+seconds**; the first `uv sync` takes longer since it downloads roughly 550 MB of wheels.
 
-### Looking at the data first
+Optional, only for live LLM calls — everything else works without it:
 
-You do not need to install anything to see what the simulator produces. A complete `fast` world
-(~400 KB) is committed at [`data/fast/`](data/fast/), and [`DATA.md`](DATA.md) documents all 19 tables
-with real rows from that sample — what each column means, how lots and expiry are tracked, and where
-the observable/latent boundary sits.
+```bash
+uv sync --extra llm
+```
 
-That boundary is the design idea worth understanding before reading anything else:
-`data/*/observable/` is what a real wholesaler would have in its systems, `data/*/ground_truth/` is
-what is actually true. Models may only read the former; only `eval/oracle.py` reads the latter. In the
-committed sample, we see 35% of unit demand — the rest goes to competitors and is invisible to every
-model in the repository.
+### Two scale profiles
+
+Set with `--profil` (when generating) and `--kosu` (when reading), from [`config/profiles/`](config/profiles/):
+
+| Profile | Size | Use |
+|---|---|---|
+| `full` | 200 pharmacies × 300 SKUs × 104 weeks | Every number in every report. Generates in 3 seconds |
+| `fast` | 60 × 100 × 104 | Sweeps, tests, iteration. **Committed to the repo** at [`data/fast/`](data/fast/) |
+
+**`fast` deliberately does not satisfy the M1 exit criterion.** `verify_m1 --kosu fast` returns
+**12/13**, not 13/13 — the `Persona miad_toleransi` check fails because the smaller cross-section
+weakens the tolerance/rejection correlation. That is the expected result, not a broken install. Never
+quote a headline number from `fast`.
+
+### Looking at the data without running anything
+
+A complete `fast` world (~400 KB) is committed, and [`DATA.md`](DATA.md) documents all 19 tables with
+real rows from it — what each column means, how lots and expiry are tracked, and where the
+observable/latent boundary sits.
+
+That boundary is the design idea worth understanding before anything else: `data/*/observable/` is what
+a real wholesaler would have in its systems, `data/*/ground_truth/` is what is actually true. Models
+may only read the former; only `eval/oracle.py` reads the latter. In the committed sample we see 35% of
+unit demand — the rest goes to competitors and is invisible to every model in the repository.
 
 ## Running the engine
 
@@ -152,13 +199,39 @@ profile, `--sabit` = fixed override). Documentation and reports are Turkish as w
 
 ### Verify a milestone
 
-Each script re-checks that milestone's exit criterion and regenerates its figures.
+Each script re-checks that milestone's exit criterion, prints a pass/fail table, and regenerates its
+figures. Swap `m6` for `m1`…`m7`.
 
 ```bash
 uv run python -m scripts.verify_m6 --kosu full
 ```
 
-Swap `m6` for `m1`…`m7`. `verify_m6` runs 13 checks and produces 4 plots; the others are similar.
+All seven run green on a fresh clone. Measured wall time, `--kosu full`, Apple Silicon:
+
+| Script | Checks | Time | What dominates |
+|---|---|---|---|
+| `verify_m1` | 13/13 | **7 s** | Reads the generated world |
+| `verify_m2` | 7/7 | **~6 min** | Builds the point-in-time panel and trains the hazard model |
+| `verify_m3` | 11/11 | **3 s** | Candidate generation is cheap; reuses M2 artifacts |
+| `verify_m4` | 10/10 | **~2.5 min** | Trains the T- and X-learners on 138k logged offer rows |
+| `verify_m5` | 12/12 | **~50 s** | Solves the allocation LP at three origins |
+| `verify_m6` | 13/13 | **~9 min** | 52-week closed-loop rollout across five policies |
+| `verify_m7` | 14/14 | **41 s** | Scenario run + eval harness; reuses M4 artifacts |
+
+Times were measured running the scripts in order, so `m3` and `m7` benefit from artifacts the earlier
+scripts left on disk. Run in isolation they are slower, because each rebuilds the pipeline it depends
+on. Nothing breaks either way — the dependency is a cache, not a prerequisite.
+
+Start with `m1` (instant) and `m6` (the point of the project). If you only run one thing after the
+quickstart, make it `m6`.
+
+> **One gotcha:** `verify_*` writes figures into `reports/figures/` in place. Running with `--kosu
+> fast` overwrites the committed `full`-profile figures with smaller-world versions, so your working
+> tree goes dirty and the plots no longer match the reports. Restore with:
+>
+> ```bash
+> git checkout -- reports/figures
+> ```
 
 ### Reference run
 
@@ -171,30 +244,64 @@ uv run python -m experiments.run --profil full --asama m4,m5,m6 --ad m6_full --v
 
 Stages are `m2` … `m7`; `--veri-tut` keeps the generated world on disk.
 
-### Sweep a knob
+### Sweep a knob — start here if you want to play with it
 
-This is where the learning happens. Any config path can be swept across values and seeds, in parallel.
+This is where the learning is. Any of the 354 config paths can be swept across values and seeds, in
+parallel. A good first one runs in **under 30 seconds**:
 
 ```bash
-uv run python -m experiments.sweep --knob tahsis.temizlik.tetik_gun --values 60,90,120,180 --seeds 3 --asama m5 --profil full --sabit tahsis.senaryo.miad_hizlandirma_gun=60
+uv run python -m experiments.sweep --knob politika.kisit.eczane_haftalik_teklif_tavani --values 1,5,20 --seeds 2 --asama m4 --profil fast
 ```
 
-Output: a metric table per value plus a plot showing the direction of movement. Use `--sabit
-path=value` to pin other knobs, and `--isci N` to set the worker count.
+That knob is the weekly cap on offers per pharmacy. Raising it 1 → 5 → 20 moves the margin difference
+between the propensity and uplift policies from **38 → 674 → 907 TRY**, while offer count goes
+**180 → 900 → 2,665**. Both directions are worth thinking about before you run it.
+
+It is also the most interesting knob in the repository, for a reason you can read about afterwards in
+[`reports/m6.md`](reports/m6.md) §5.1 and §6.3: narrowing the exploration rate tenfold changes
+*nothing*, because this cap forces 71% of decisions onto "no offer", whose propensity is
+exploration-independent. A knob that appears dead is often being masked by a second one.
+
+Useful flags: `--sabit path=value` pins other knobs, `--isci N` sets worker count, `--asama` picks
+which stages run (`m2` … `m7`), `--seeds N` sets repetitions.
+
+Each sweep writes to `experiments/runs/_sweep_<knob>_<timestamp>/`. The console table is wide — for
+anything serious, read `ozet.csv` from that directory instead, and look at the generated plot.
+
+**The discipline that makes this worthwhile:** write your prediction down *before* running. The
+project keeps a calibration log at [`notes/predictions.md`](notes/predictions.md) where every exercise
+is recorded as predict-then-run, including the ones that were wrong — those are the entries worth
+reading.
 
 ### Compare two runs
 
+Puts two runs side by side with the difference, standard error and a rough `|z|`. It reads from
+`experiments/runs/`, so it needs runs you have already produced — either two named reference runs, or
+two values from a sweep:
+
 ```bash
-uv run python -m experiments.compare --a m5_full --b m6_full
+uv run python -m experiments.compare --a 1 --b 20 --sweep _sweep_politika.kisit.eczane_haftalik_teklif_tavani_<timestamp> --metrik-filtre marj
 ```
+
+Following the sweep above, that shows the offer cap raising `uplift_x` incremental margin from 3,187 to
+8,415 TRY (`|z|` 7.18) while `propensity_ham` — the textbook "maximize conversion" policy — collapses
+from −9,232 to −29,540 (`|z|` 8.31). The same knob helps one policy and destroys another, which is M4's
+whole argument in a single table.
 
 ### LLM regression harness
 
-Runs the eval cases against recorded conversations — no API key required.
+Runs 12 eval cases against **recorded** conversations, so no API key and no network are needed. Ten of
+the cases are deliberately mutated outputs — a hallucinated SKU, a fabricated number, a claim that
+violates a hard constraint — and the auditors must catch all ten without false-alarming on the two
+clean ones.
 
 ```bash
 uv run python -m harness.run --kosu full
 ```
+
+Prints `SONUC: 12/12 vaka gecti`. Takes **about 3 minutes** on a fresh clone, nearly all of it
+rebuilding the M4 pipeline the cases are scored against; the harness stage itself is 0.2 seconds. If
+you have just run `verify_m4` or `verify_m7`, it is much faster.
 
 ### Tests
 
@@ -202,7 +309,10 @@ uv run python -m harness.run --kosu full
 uv run pytest -q
 ```
 
-The full suite takes about 8 minutes.
+213 tests in about **3.5 minutes** on a fresh clone — most of that is the simulator and model code
+genuinely running, not mocks. It needs **no generated world and no API key** (verified on a clone
+containing only the committed `data/fast`), so it is the safest first command if you just want to
+confirm the checkout is sound.
 
 ## Repository layout
 
