@@ -54,7 +54,7 @@ import numpy as np
 import polars as pl
 
 from core.config import Config
-from core.rng import SeedBankasi
+from core.rng import SeedBank
 from sim.calendar import GUN_HAFTA, nobet_gun_sayilari, takvim_kur
 from sim.events import OlayDunyasi, olaylari_uret
 from sim.lots import (EczaneLotKovalari, ImhaSatiri, LotDeposu, TahsisSatiri,
@@ -213,10 +213,10 @@ class DunyaDurumu:
         return self.kovalar.toplam()
 
 
-def dunya_kur(cfg: Config, seedler: SeedBankasi) -> DunyaDurumu:
+def dunya_kur(cfg: Config, seedler: SeedBank) -> DunyaDurumu:
     """Haftalik dongu oncesi butun kurulum. Cekilis sirasi M1'den degismedi."""
     P, S, W = cfg.profil.eczane_sayisi, cfg.profil.sku_sayisi, cfg.profil.hafta_sayisi
-    rng = seedler.uretec("dunya_dongusu")
+    rng = seedler.generator("dunya_dongusu")
 
     takvim = takvim_kur(cfg)
     urunler, latent_urun = urun_evreni_kur(cfg, seedler)
@@ -588,7 +588,7 @@ def hafta_adimi(d: DunyaDurumu, teklif_sevk: np.ndarray | None = None,
     d.w = w + 1
 
 
-def dunya_kos(cfg: Config, seedler: SeedBankasi) -> DunyaCiktisi:
+def dunya_kos(cfg: Config, seedler: SeedBank) -> DunyaCiktisi:
     d = dunya_kur(cfg, seedler)
     for _ in range(d.W):
         hafta_adimi(d)

@@ -10,40 +10,40 @@ import numpy as np
 import polars as pl
 import pytest
 
-from core.config import config_yukle
-from core.io import LATENT_KOLONLAR
-from core.rng import SeedBankasi
+from core.config import load_config
+from core.io import LATENT_COLUMNS
+from core.rng import SeedBank
 from sim.calendar import GUN_HAFTA
 from sim.world import dunya_kos
 
 
 @pytest.fixture(scope="module")
 def dunya():
-    cfg = config_yukle("fast")
-    return cfg, dunya_kos(cfg, SeedBankasi(cfg.profil.temel_seed))
+    cfg = load_config("fast")
+    return cfg, dunya_kos(cfg, SeedBank(cfg.profil.temel_seed))
 
 
 def test_ayni_seed_ayni_dunya():
-    cfg = config_yukle("fast")
-    a = dunya_kos(cfg, SeedBankasi(cfg.profil.temel_seed))
-    b = dunya_kos(cfg, SeedBankasi(cfg.profil.temel_seed))
+    cfg = load_config("fast")
+    a = dunya_kos(cfg, SeedBank(cfg.profil.temel_seed))
+    b = dunya_kos(cfg, SeedBank(cfg.profil.temel_seed))
     assert a.siparisler.equals(b.siparisler)
     assert a.sevkiyat_satirlari.equals(b.sevkiyat_satirlari)
     assert a.hucre_haftalik.equals(b.hucre_haftalik)
 
 
 def test_farkli_seed_farkli_dunya():
-    cfg = config_yukle("fast")
-    a = dunya_kos(cfg, SeedBankasi(cfg.profil.temel_seed))
-    b = dunya_kos(cfg, SeedBankasi(cfg.profil.temel_seed + 1))
+    cfg = load_config("fast")
+    a = dunya_kos(cfg, SeedBank(cfg.profil.temel_seed))
+    b = dunya_kos(cfg, SeedBank(cfg.profil.temel_seed + 1))
     assert not a.siparisler.equals(b.siparisler)
 
 
 def test_seed_asamalari_bagimsiz():
     """Bir asamanin cekilis sayisi degisse bile digerinin akisi kaymamali."""
-    a = SeedBankasi(7)
-    assert a.tohum("urun_evreni") != a.tohum("eczane_evreni")
-    assert SeedBankasi(7).tohum("olaylar") == SeedBankasi(7).tohum("olaylar")
+    a = SeedBank(7)
+    assert a.seed_for("urun_evreni") != a.seed_for("eczane_evreni")
+    assert SeedBank(7).seed_for("olaylar") == SeedBank(7).seed_for("olaylar")
 
 
 def test_gozlemlenebilir_tablolarda_latent_kolon_yok(dunya):
@@ -54,7 +54,7 @@ def test_gozlemlenebilir_tablolarda_latent_kolon_yok(dunya):
         d.urun_fiyat_haftalik, d.makro_haftalik,
     ]
     for df in gozlemlenebilir:
-        assert not (set(df.columns) & LATENT_KOLONLAR)
+        assert not (set(df.columns) & LATENT_COLUMNS)
 
 
 def test_olay_tablosu_gelecegi_sizdirmiyor(dunya):

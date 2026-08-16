@@ -22,7 +22,7 @@ import numpy as np
 import polars as pl
 
 from core.config import Config
-from core.rng import SeedBankasi
+from core.rng import SeedBank
 
 # Antisipasyon penceresi icinde siddet dogrusal olarak yukselir: olaya bir
 # hafta kala tam siddet. Rampanin sekli domain kararidir, seviye knob'dur.
@@ -60,12 +60,12 @@ def _olusum_haftalari(rng, W: int, min_ara: int, max_ara: int) -> list[int]:
 
 def olaylari_uret(
     cfg: Config,
-    seedler: SeedBankasi,
+    seedler: SeedBank,
     urunler: pl.DataFrame,
     latent_populerlik: np.ndarray,
     takvim: pl.DataFrame,
 ) -> OlayDunyasi:
-    rng = seedler.uretec("olaylar")
+    rng = seedler.generator("olaylar")
     S = cfg.profil.sku_sayisi
     W = cfg.profil.hafta_sayisi
 

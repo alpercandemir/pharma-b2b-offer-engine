@@ -33,8 +33,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
 
-from core.config import Config, config_yukle  # noqa: E402
-from core.io import VERI_DIZINI, Kosu  # noqa: E402
+from core.config import Config, load_config  # noqa: E402
+from core.io import DATA_DIR, Run  # noqa: E402
 from eval import aday as ev_aday  # noqa: E402
 from experiments.run import m3_boru_hatti, m3_ihlaller  # noqa: E402
 from features.okuma import GozlemlenebilirKaynak  # noqa: E402
@@ -42,9 +42,9 @@ from policy import candidates as pol  # noqa: E402
 from policy.constraints import VETO_SEBEPLERI, kisit_uygula, oneri_listesi  # noqa: E402
 from scripts.verify_m2 import YASAK_ADLAR, kod_metni  # noqa: E402
 
-KOK = Path(__file__).resolve().parent.parent
-SEKIL_DIZINI = KOK / "reports" / "figures" / "m3"
-GECICI = KOK / "experiments" / "runs" / "_dogrulama_m3"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SEKIL_DIZINI = REPO_ROOT / "reports" / "figures" / "m3"
+GECICI = REPO_ROOT / "experiments" / "runs" / "_dogrulama_m3"
 
 # Cikis kriteri esikleri. Tuning knob'u DEGIL, kriterin kendisi.
 # Stres kurulumunda kirmizi/yesil ilan edilen SKU sayisi: havuzun tepesinden
@@ -99,7 +99,7 @@ def stres_kosusu(kosu_adi: str, profil: str, kok: Path) -> tuple:
     Uc baski ayni anda: (1) havuzun tepesi kirmizi/yesil, (2) her lot kisa
     miatli ve baski agirligi 1000, (3) kredi tavani 50'de bir.
     """
-    cfg = config_yukle(profil, gecersiz_kilma={
+    cfg = load_config(profil, gecersiz_kilma={
         "politika.aday.miad_baskisi_agirligi": STRES_MIAD_AGIRLIGI,
         "politika.aday.miad_baskisi_esik_gun": STRES_MIAD_ESIK_GUN,
         "politika.kisit.kredi_kullanim_tavani": STRES_KREDI_TAVANI,
@@ -123,7 +123,7 @@ def stres_kosusu(kosu_adi: str, profil: str, kok: Path) -> tuple:
 # --------------------------------------------------------------------------
 def kontrol_statik_sizinti() -> Kontrol:
     bulgular = []
-    for yol in sorted((KOK / "policy").glob("*.py")):
+    for yol in sorted((REPO_ROOT / "policy").glob("*.py")):
         kod = kod_metni(yol)
         bulgular += [f"{yol.name}:{k}" for k in YASAK_ADLAR if k in kod]
     return Kontrol("Politika katmani ground_truth'a dokunmuyor", not bulgular,
@@ -136,12 +136,12 @@ def kontrol_point_in_time(kosu_adi: str, cfg: Config) -> Kontrol:
     dunya = pol.dunya_yukle(kaynak, cfg)
     kesme = dunya.W // 2
 
-    hedef = Kosu("kesilmis", kok=GECICI).hazirla()
-    for tablo in kaynak.tablolar():
+    hedef = Run("kesilmis", kok=GECICI).prepare()
+    for tablo in kaynak.tables():
         df = kaynak.tablo(tablo)
         if "hafta" in df.columns:
             df = df.filter(pl.col("hafta") <= kesme)
-        hedef.yaz_gozlemlenebilir(tablo, df)
+        hedef.write_observable(tablo, df)
     kesik = pol.dunya_yukle(GozlemlenebilirKaynak("kesilmis", kok=GECICI), cfg)
 
     tam = pol.uretici_skorlari(dunya, cfg, pol.gorunum_kur(dunya, cfg, kesme))
@@ -186,7 +186,7 @@ def kontrol_stok_muhasebesi(kosu_adi: str, cfg: Config) -> Kontrol:
 
 def kontrol_determinizm(cfg: Config, kosu_adi: str) -> Kontrol:
     def _ozet():
-        c = m3_boru_hatti(cfg, kosu_adi, VERI_DIZINI, oracle_hedefi=False)
+        c = m3_boru_hatti(cfg, kosu_adi, DATA_DIR, oracle_hedefi=False)
         liste = oneri_listesi(c.teklifler)
         return (liste.height, round(float(liste["teklif_adedi"].sum()), 6),
                 round(float(c.liste["liste_recall"].mean()), 10))
@@ -489,14 +489,14 @@ def main() -> None:
                     help="point-in-time ve determinizm kontrollerini atla")
     args = ap.parse_args()
 
-    kosu = Kosu(args.kosu)
-    manifest = kosu.manifest_oku()
+    kosu = Run(args.kosu)
+    manifest = kosu.read_manifest()
     profil = args.profil or manifest["profil"]
-    cfg = config_yukle(profil)
+    cfg = load_config(profil)
     print(f"kosu={args.kosu} profil={profil} dunya_config_hash={manifest['config_hash']} "
           f"m3_config_hash={cfg.hash()}")
 
-    c = m3_boru_hatti(cfg, args.kosu, VERI_DIZINI)
+    c = m3_boru_hatti(cfg, args.kosu, DATA_DIR)
     K = cfg.politika.aday.havuz_boyutu_k
     print(f"origin={c.originler} | aday satiri={c.teklifler.height} | "
           f"K={K} | sure={c.zaman}")
@@ -525,7 +525,7 @@ def main() -> None:
     with pl.Config(tbl_rows=20, tbl_cols=20, tbl_width_chars=220, float_precision=4):
         print(f"\nveto ozeti:\n{c.veto}")
 
-    stres = stres_kosusu(args.kosu, profil, VERI_DIZINI)
+    stres = stres_kosusu(args.kosu, profil, DATA_DIR)
     sekil_recall_egrisi(c, cfg)
     sekil_veto_semasi(c, cfg, stres)
     sekil_soguk_start(c, cfg)

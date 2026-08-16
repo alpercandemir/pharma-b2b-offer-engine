@@ -18,8 +18,8 @@ import argparse
 import numpy as np
 import polars as pl
 
-from core.config import config_yukle
-from core.io import VERI_DIZINI, Kosu
+from core.config import load_config
+from core.io import DATA_DIR, Run
 from experiments.run import m4_boru_hatti
 
 
@@ -35,11 +35,11 @@ def main() -> None:
                     help="kac karar haftasi geriye gidilsin (varsayilan config'ten)")
     a = ap.parse_args()
 
-    kosu = Kosu(a.kosu)
+    kosu = Run(a.kosu)
     ez = ({} if a.origin_sayisi is None
           else {"politika.aday.degerlendirme.origin_sayisi": a.origin_sayisi})
-    cfg = config_yukle(profil=kosu.manifest_oku()["profil"], gecersiz_kilma=ez)
-    m4 = m4_boru_hatti(cfg, a.kosu, VERI_DIZINI)
+    cfg = load_config(profil=kosu.read_manifest()["profil"], gecersiz_kilma=ez)
+    m4 = m4_boru_hatti(cfg, a.kosu, DATA_DIR)
 
     t = a.hafta if a.hafta is not None else m4.olcum_originleri[-1]
     if t not in m4.olcum_originleri:

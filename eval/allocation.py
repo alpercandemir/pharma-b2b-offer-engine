@@ -49,7 +49,7 @@ import numpy as np
 import polars as pl
 
 from core.config import Config
-from core.rng import SeedBankasi
+from core.rng import SeedBank
 from policy.allocate import Kolonlar, LotGorunumu, TahsisSonucu
 from policy.candidates import AdayDunyasi, OriginGorunumu
 from policy.scorer import TEKLIF_YOK, TeklifMatrisleri
@@ -305,10 +305,10 @@ def politika_olcumu(cfg: Config, dunya: AdayDunyasi, gor: OriginGorunumu,
     idx = np.arange(sonuc.kol.size)
     # Seed origin ve politika adina gomulu (core/rng.py disiplini): ayni kosu
     # iki kez calisinca ayni ornekler, farkli politikalar ORTAK carpanlar.
-    seedler = SeedBankasi(d.ornek_seed)
+    seedler = SeedBank(d.ornek_seed)
     ornekler = []
     for r in range(d.ornek_sayisi):
-        rng = seedler.uretec(f"karsilama_{gor.t}_{sonuc.politika}_{r}")
+        rng = seedler.generator(f"karsilama_{gor.t}_{sonuc.politika}_{r}")
         ornekler.append(_tekrar(cfg, dunya, gor, lotlar, teklifler, mat, tepki,
                                 sonuc, kolonlar, durum, sevk_hizi, rng))
 

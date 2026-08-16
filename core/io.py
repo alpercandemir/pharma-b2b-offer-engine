@@ -6,7 +6,7 @@ Bu sinir yorum satiriyla degil, yazma anininda ZORLANARAK korunur:
     data/<kosu>/observable/    -> modelin gorebilecegi her sey
     data/<kosu>/ground_truth/  -> latent gercek; sadece olcum/oracle icin
 
-`yaz_gozlemlenebilir()` bilinen bir latent kolon adi gorurse yazmaz, hata
+`write_observable()` bilinen bir latent kolon adi gorurse yazmaz, hata
 firlatir. Kaza eseri sizinti bu yuzden kosuyu dusurur, sessizce gecmez.
 """
 
@@ -19,12 +19,12 @@ from pathlib import Path
 
 import polars as pl
 
-KOK = Path(__file__).resolve().parent.parent
-VERI_DIZINI = KOK / "data"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = REPO_ROOT / "data"
 
 # Gozlemlenebilir katmanda gorunmesi YASAK kolon adlari.
 # Yeni bir latent buyukluk turetildiginde buraya eklenir; testi bu liste besler.
-LATENT_KOLONLAR: frozenset[str] = frozenset(
+LATENT_COLUMNS: frozenset[str] = frozenset(
     {
         "share_of_wallet",
         "sow",
@@ -43,55 +43,55 @@ LATENT_KOLONLAR: frozenset[str] = frozenset(
 )
 
 
-class Kosu:
+class Run:
     """Tek bir simulasyon kosusunun cikti dizini."""
 
     def __init__(self, ad: str, kok: Path | None = None) -> None:
         self.ad = ad
-        self.kok = (kok or VERI_DIZINI) / ad
+        self.kok = (kok or DATA_DIR) / ad
         self.gozlemlenebilir = self.kok / "observable"
         self.gercek = self.kok / "ground_truth"
 
-    def hazirla(self, temizle: bool = True) -> "Kosu":
-        if temizle and self.kok.exists():
+    def prepare(self, clean: bool = True) -> "Run":
+        if clean and self.kok.exists():
             shutil.rmtree(self.kok)
         self.gozlemlenebilir.mkdir(parents=True, exist_ok=True)
         self.gercek.mkdir(parents=True, exist_ok=True)
         return self
 
-    def yaz_gozlemlenebilir(self, ad: str, df: pl.DataFrame) -> Path:
-        ihlal = sorted(set(df.columns) & LATENT_KOLONLAR)
-        if ihlal:
+    def write_observable(self, ad: str, df: pl.DataFrame) -> Path:
+        violations = sorted(set(df.columns) & LATENT_COLUMNS)
+        if violations:
             raise ValueError(
-                f"Gozlemlenebilirlik ihlali: '{ad}' tablosu latent kolon tasiyor: {ihlal}. "
+                f"Gozlemlenebilirlik ihlali: '{ad}' tablosu latent kolon tasiyor: {violations}. "
                 f"Bu kolonlar ground_truth/ altina yazilir."
             )
-        yol = self.gozlemlenebilir / f"{ad}.parquet"
-        df.write_parquet(yol)
-        return yol
+        path = self.gozlemlenebilir / f"{ad}.parquet"
+        df.write_parquet(path)
+        return path
 
-    def yaz_gercek(self, ad: str, df: pl.DataFrame) -> Path:
-        yol = self.gercek / f"{ad}.parquet"
-        df.write_parquet(yol)
-        return yol
+    def write_ground_truth(self, ad: str, df: pl.DataFrame) -> Path:
+        path = self.gercek / f"{ad}.parquet"
+        df.write_parquet(path)
+        return path
 
-    def oku_gozlemlenebilir(self, ad: str) -> pl.DataFrame:
+    def read_observable(self, ad: str) -> pl.DataFrame:
         return pl.read_parquet(self.gozlemlenebilir / f"{ad}.parquet")
 
-    def oku_gercek(self, ad: str) -> pl.DataFrame:
+    def read_ground_truth(self, ad: str) -> pl.DataFrame:
         return pl.read_parquet(self.gercek / f"{ad}.parquet")
 
-    def manifest_yaz(self, icerik: dict) -> Path:
-        icerik = dict(icerik)
-        icerik["yazilma_zamani_utc"] = datetime.now(timezone.utc).isoformat()
-        yol = self.kok / "manifest.json"
-        yol.write_text(json.dumps(icerik, indent=2, ensure_ascii=False), encoding="utf-8")
-        return yol
+    def write_manifest(self, content: dict) -> Path:
+        content = dict(content)
+        content["yazilma_zamani_utc"] = datetime.now(timezone.utc).isoformat()
+        path = self.kok / "manifest.json"
+        path.write_text(json.dumps(content, indent=2, ensure_ascii=False), encoding="utf-8")
+        return path
 
-    def manifest_oku(self) -> dict:
+    def read_manifest(self) -> dict:
         return json.loads((self.kok / "manifest.json").read_text(encoding="utf-8"))
 
-    def tablolar(self) -> dict[str, list[str]]:
+    def tables(self) -> dict[str, list[str]]:
         return {
             "observable": sorted(p.stem for p in self.gozlemlenebilir.glob("*.parquet")),
             "ground_truth": sorted(p.stem for p in self.gercek.glob("*.parquet")),

@@ -33,13 +33,13 @@ from agent import client as ac
 from agent import narrative as nv
 from agent import scenario as sc
 from agent import tools as at
-from core.config import Config, config_yukle
-from core.io import VERI_DIZINI, Kosu
+from core.config import Config, load_config
+from core.io import DATA_DIR, Run
 from harness import denetim as dn
 from harness import mutasyon as mt
 
-KOK = Path(__file__).resolve().parent.parent
-VAKA_DOSYASI = KOK / "harness" / "cases.yaml"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+VAKA_DOSYASI = REPO_ROOT / "harness" / "cases.yaml"
 # Dusen vaka basina ekrana basilan bulgu sayisi. Ekran sabiti, knob degil:
 # denetimin sonucunu degil ciktinin uzunlugunu belirler.
 BASILAN_BULGU = 5
@@ -97,7 +97,7 @@ def baglam_hazirla(cfg: Config, kosu_adi: str, kok: Path | None = None,
     from experiments.run import m4_boru_hatti      # gec import: dongu kirilir
 
     if m4 is None:
-        m4 = m4_boru_hatti(cfg, kosu_adi, kok or VERI_DIZINI)
+        m4 = m4_boru_hatti(cfg, kosu_adi, kok or DATA_DIR)
     senaryo = sc.senaryolari_kos(cfg, m4)
     baglam = at.baglam_kur(cfg, senaryo)
     return HarnessBaglami(cfg=cfg, kosu=senaryo, baglam=baglam,
@@ -105,7 +105,7 @@ def baglam_hazirla(cfg: Config, kosu_adi: str, kok: Path | None = None,
 
 
 def kayit_yolu(cfg: Config, ad: str) -> Path:
-    return KOK / cfg.ajan.kayit_dizini / ad.format(profil=cfg.profil.ad)
+    return REPO_ROOT / cfg.ajan.kayit_dizini / ad.format(profil=cfg.profil.ad)
 
 
 # --------------------------------------------------------------------------
@@ -274,9 +274,9 @@ def main() -> None:
     ap.add_argument("--metin", action="store_true", help="brifing metnini bas")
     args = ap.parse_args()
 
-    manifest = Kosu(args.kosu).manifest_oku()
+    manifest = Run(args.kosu).read_manifest()
     profil = args.profil or manifest["profil"]
-    cfg = config_yukle(profil)
+    cfg = load_config(profil)
     # `dunya_hash` M1 doneminde uretilmis kosu manifestlerinde bulunmayabilir;
     # varsa basilir, yoksa kosu durmaz (bu alan M7'nin urettigi bir sey degil).
     print(f"kosu={args.kosu} profil={profil} config_hash={cfg.hash()} "
@@ -293,7 +293,7 @@ def main() -> None:
                 continue
             eczane_id = _eczane_sec(hb, vaka)
             yol = kayit_uret(hb, eczane_id, kayit_yolu(cfg, vaka.kayit))
-            print(f"kayit yazildi: {yol.relative_to(KOK)} (eczane {eczane_id})")
+            print(f"kayit yazildi: {yol.relative_to(REPO_ROOT)} (eczane {eczane_id})")
         return
 
     vakalar = vakalari_yukle()

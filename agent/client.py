@@ -28,7 +28,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-KOK = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Kayit bicimi surumu. Kayit semasi degisirse eski kayitlar sessizce yanlis
 # oynatilmasin diye dosyaya yazilir ve okurken denetlenir.

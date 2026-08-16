@@ -54,7 +54,7 @@ class Profil(Kati):
     temel_seed: int
 
 
-class ProfilDosyasi(Kati):
+class ProfileFile(Kati):
     profil: Profil
 
 
@@ -1483,7 +1483,7 @@ def _yukle(yol: Path) -> dict:
         return yaml.safe_load(f)
 
 
-def config_yukle(profil: str, config_dir: Path | None = None,
+def load_config(profil: str, config_dir: Path | None = None,
                  gecersiz_kilma: dict[str, object] | None = None) -> Config:
     """Profil adiyla tum config'i yukler.
 

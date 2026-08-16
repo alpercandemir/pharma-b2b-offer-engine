@@ -37,7 +37,7 @@ import numpy as np
 import polars as pl
 
 from core.config import Config
-from core.rng import SeedBankasi
+from core.rng import SeedBank
 from policy.scorer import TEKLIF_YOK, AksiyonUzayi
 
 # Teklif verme olasiliginin kirpma sinirlari. Ne 0 ne 1 olabilir: 0'da o
@@ -105,7 +105,7 @@ def kayit_olasiliklari(dunya, cfg: Config, uzay: AksiyonUzayi,
     return pi
 
 
-def kayit_kosusu(dunya, cfg: Config, seedler: SeedBankasi, uzay: AksiyonUzayi,
+def kayit_kosusu(dunya, cfg: Config, seedler: SeedBank, uzay: AksiyonUzayi,
                  teklifler: pl.DataFrame, izinli: np.ndarray,
                  t: int) -> KayitCiktisi:
     """Bir origin'de kayit politikasini kosar ve propensity'yi loglar."""
@@ -115,7 +115,7 @@ def kayit_kosusu(dunya, cfg: Config, seedler: SeedBankasi, uzay: AksiyonUzayi,
         return KayitCiktisi(np.zeros(0, dtype=np.int32), np.zeros(0), pi)
     # Asama adi `kayit.seed`i tasir: knob degisince loglanan aksiyonlar
     # degisir, dunyanin cekilis akisi degismez (core/rng.py).
-    rng = seedler.uretec(f"kayit_politikasi_{cfg.uplift.kayit.seed}_{t}")
+    rng = seedler.generator(f"kayit_politikasi_{cfg.uplift.kayit.seed}_{t}")
     kumulatif = np.cumsum(pi, axis=1)
     kol = (rng.random(n)[:, None] > kumulatif).sum(axis=1).astype(np.int32)
     kol = np.minimum(kol, uzay.A - 1)

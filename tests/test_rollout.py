@@ -23,8 +23,8 @@ import numpy as np
 import polars as pl
 import pytest
 
-from core.config import config_yukle
-from core.rng import SeedBankasi
+from core.config import load_config
+from core.rng import SeedBank
 from sim import rollout as rl
 from sim.world import dunya_kos, dunya_kur, hafta_adimi
 
@@ -36,7 +36,7 @@ KISA_HAFTA = 30
 
 @pytest.fixture(scope="module")
 def kisa_cfg():
-    return config_yukle(PROFIL, gecersiz_kilma={
+    return load_config(PROFIL, gecersiz_kilma={
         "profil.hafta_sayisi": KISA_HAFTA,
         # Dunya kisalinca M4'un zaman kilidi (egitim penceresi olcum
         # penceresine tasamaz) baglar; egitim penceresi de kisaltiliyor.
@@ -51,7 +51,7 @@ def kisa_cfg():
 
 
 def _durum(cfg, hafta: int):
-    d = dunya_kur(cfg, SeedBankasi(cfg.profil.temel_seed))
+    d = dunya_kur(cfg, SeedBank(cfg.profil.temel_seed))
     for _ in range(hafta):
         hafta_adimi(d)
     return d
@@ -62,7 +62,7 @@ def _durum(cfg, hafta: int):
 # --------------------------------------------------------------------------
 def test_adim_adim_kosu_tek_parca_kosuyla_ozdes(kisa_cfg):
     """M1-M5'in gecerliligini koruyan kilit. Tablolar BIT BAZINDA esit olmali."""
-    tek_parca = dunya_kos(kisa_cfg, SeedBankasi(kisa_cfg.profil.temel_seed))
+    tek_parca = dunya_kos(kisa_cfg, SeedBank(kisa_cfg.profil.temel_seed))
     adim_adim = _durum(kisa_cfg, KISA_HAFTA)
 
     assert adim_adim.w == KISA_HAFTA

@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-from core.config import config_yukle
+from core.config import load_config
 from eval import metrics as mt
 from experiments.run import KOSU_DIZINI
 
@@ -107,7 +107,7 @@ def main() -> None:
     ap.add_argument("--metrik-filtre", default=None, help="metrik adinda gecen metin")
     args = ap.parse_args()
 
-    cfg = config_yukle("fast")
+    cfg = load_config("fast")
     d = cfg.tukenme.degerlendirme
 
     if args.sweep:

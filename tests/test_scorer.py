@@ -10,7 +10,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from core.config import config_yukle
+from core.config import load_config
 from policy import scorer
 
 PROFIL = "fast"
@@ -18,7 +18,7 @@ PROFIL = "fast"
 
 @pytest.fixture(scope="module")
 def cfg():
-    return config_yukle(PROFIL)
+    return load_config(PROFIL)
 
 
 def _aday(n=6, adet=None, koli=None, mf_izinli=None, hiz=None):
@@ -66,7 +66,7 @@ def test_taban_vade_aksiyon_uzayinda_olmak_zorunda():
     """
     from pydantic import ValidationError
     with pytest.raises(ValidationError, match="taban_vade_gun"):
-        config_yukle(PROFIL,
+        load_config(PROFIL,
                      gecersiz_kilma={"politika.aksiyon.taban_vade_gun": 45})
 
 

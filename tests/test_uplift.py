@@ -23,9 +23,9 @@ import numpy as np
 import polars as pl
 import pytest
 
-from core.config import config_yukle
-from core.io import Kosu
-from core.rng import SeedBankasi
+from core.config import load_config
+from core.io import Run
+from core.rng import SeedBank
 from eval import uplift as ev
 from experiments.run import _origin_blogu, _politikalar, m4_boru_hatti
 from features import teklif as ft
@@ -44,13 +44,13 @@ KOSU = "_test_m4"
 
 @pytest.fixture(scope="module")
 def cfg():
-    return config_yukle(PROFIL)
+    return load_config(PROFIL)
 
 
 @pytest.fixture(scope="module")
 def dunya_dizini(tmp_path_factory, cfg):
     kok = tmp_path_factory.mktemp("m4")
-    dunya_yaz(cfg, Kosu("dunya", kok=kok))
+    dunya_yaz(cfg, Run("dunya", kok=kok))
     return kok
 
 
@@ -60,7 +60,7 @@ def ortam(cfg, dunya_dizini):
     dunya = pol.dunya_yukle(kaynak, cfg)
     td = ft.teklif_dunyasi_yukle(kaynak, cfg, dunya)
     durum = GercekDurum("dunya", kok=dunya_dizini)
-    seedler = SeedBankasi(cfg.profil.temel_seed)
+    seedler = SeedBank(cfg.profil.temel_seed)
     evren = tepki_evreni_kur(cfg, seedler, dunya.eczaneler, dunya.urunler,
                              durum.latent_eczane)
     t = pol.origin_haftalari(cfg, dunya.W)[-1]
@@ -94,7 +94,7 @@ def test_bedelsiz_teklif_kabulu_yukseltiyor(cfg, ortam):
     olasiligi kontrolun ALTINA inebilir ve bu dogru davranistir (SPEC 2.5),
     ama olculmek istenen sey o degil.
     """
-    kapali = config_yukle(PROFIL,
+    kapali = load_config(PROFIL,
                           gecersiz_kilma={"tepki.miad.direnc_katsayisi": 0.0})
     tp = tepki_hesapla(kapali, ortam["evren"], ortam["durum"],
                        ortam["blok"].mat.uzay, ortam["blok"].teklifler,
@@ -122,7 +122,7 @@ def test_ihtiyac_etkilesimi_upliftı_sonduruyor(cfg, ortam):
 
 def test_heterojenlik_carpani_sifirda_duyarlilik_esitleniyor(cfg, ortam):
     """`heterojenlik_carpani = 0` -> butun eczaneler ayni duyarlilikta."""
-    kapali = config_yukle(
+    kapali = load_config(
         PROFIL, gecersiz_kilma={"tepki.duyarlilik.heterojenlik_carpani": 0.0})
     evren = tepki_evreni_kur(kapali, ortam["seedler"], ortam["dunya"].eczaneler,
                              ortam["dunya"].urunler, ortam["durum"].latent_eczane)
@@ -134,9 +134,9 @@ def test_tepki_tekrar_uretilebilir(cfg, ortam):
     a = tepki_hesapla(cfg, ortam["evren"], ortam["durum"], ortam["blok"].mat.uzay,
                       ortam["blok"].teklifler, ortam["t"], ortam["blok"].mat.adet)
     assert np.array_equal(a.olasilik, ortam["tepki"].olasilik)
-    k1, m1 = sonuc_ornekle(cfg, SeedBankasi(cfg.profil.temel_seed), a,
+    k1, m1 = sonuc_ornekle(cfg, SeedBank(cfg.profil.temel_seed), a,
                            np.zeros(a.olasilik.shape[0], dtype=int), ortam["t"])
-    k2, m2 = sonuc_ornekle(cfg, SeedBankasi(cfg.profil.temel_seed), a,
+    k2, m2 = sonuc_ornekle(cfg, SeedBank(cfg.profil.temel_seed), a,
                            np.zeros(a.olasilik.shape[0], dtype=int), ortam["t"])
     assert np.array_equal(k1, k2) and np.array_equal(m1, m2)
 
@@ -174,7 +174,7 @@ def test_kesif_orani_sifir_config_reddediliyor():
     """Overlap kirilmasi kod incelemesine degil config yuklemesine bagli."""
     from pydantic import ValidationError
     with pytest.raises(ValidationError, match="kesif_orani"):
-        config_yukle(PROFIL, gecersiz_kilma={"uplift.kayit.kesif_orani": 0.0})
+        load_config(PROFIL, gecersiz_kilma={"uplift.kayit.kesif_orani": 0.0})
 
 
 def test_kayit_secimi_propensity_ile_tutarli(cfg, ortam):
@@ -310,12 +310,12 @@ def test_teklif_ozellikleri_point_in_time(cfg, ortam, tmp_path):
     """Gelecek silinince ayni origin'in ozellik matrisi BIT BAZINDA ayni."""
     kaynak = GozlemlenebilirKaynak("dunya", kok=ortam["kok"])
     kesme = ortam["dunya"].W // 2
-    hedef = Kosu("kesilmis", kok=tmp_path).hazirla()
-    for tablo in kaynak.tablolar():
+    hedef = Run("kesilmis", kok=tmp_path).prepare()
+    for tablo in kaynak.tables():
         df = kaynak.tablo(tablo)
         if "hafta" in df.columns:
             df = df.filter(pl.col("hafta") <= kesme)
-        hedef.yaz_gozlemlenebilir(tablo, df)
+        hedef.write_observable(tablo, df)
     kesik_kaynak = GozlemlenebilirKaynak("kesilmis", kok=tmp_path)
     kesik = pol.dunya_yukle(kesik_kaynak, cfg)
 

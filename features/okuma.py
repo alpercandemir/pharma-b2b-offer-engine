@@ -21,8 +21,8 @@ from pathlib import Path
 
 import polars as pl
 
-KOK = Path(__file__).resolve().parent.parent
-VERI_DIZINI = KOK / "data"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = REPO_ROOT / "data"
 
 
 class GozlemlenebilirKaynak:
@@ -30,7 +30,7 @@ class GozlemlenebilirKaynak:
 
     def __init__(self, kosu_adi: str, kok: Path | None = None) -> None:
         self.kosu_adi = kosu_adi
-        self.dizin = (kok or VERI_DIZINI) / kosu_adi / "observable"
+        self.dizin = (kok or DATA_DIR) / kosu_adi / "observable"
         if not self.dizin.is_dir():
             raise FileNotFoundError(f"gozlemlenebilir katman yok: {self.dizin}")
 
@@ -40,9 +40,9 @@ class GozlemlenebilirKaynak:
         yol = self.dizin / f"{ad}.parquet"
         if not yol.is_file():
             raise FileNotFoundError(
-                f"'{ad}' gozlemlenebilir katmanda yok. Mevcut: {self.tablolar()}"
+                f"'{ad}' gozlemlenebilir katmanda yok. Mevcut: {self.tables()}"
             )
         return pl.read_parquet(yol)
 
-    def tablolar(self) -> list[str]:
+    def tables(self) -> list[str]:
         return sorted(p.stem for p in self.dizin.glob("*.parquet"))

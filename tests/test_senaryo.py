@@ -22,7 +22,7 @@ import pytest
 from pydantic import ValidationError
 
 from agent import scenario as sc
-from core.config import config_yukle
+from core.config import load_config
 from sim.calendar import GUN_HAFTA
 
 PROFIL = "fast"
@@ -30,7 +30,7 @@ PROFIL = "fast"
 
 @pytest.fixture(scope="module")
 def cfg():
-    return config_yukle(PROFIL)
+    return load_config(PROFIL)
 
 
 # --------------------------------------------------------------------------
@@ -39,7 +39,7 @@ def cfg():
 def test_taban_rejim_notr_olmali():
     """Notr olmayan taban 'tabana gore fark' sutunlarini anlamsiz kilar."""
     with pytest.raises(ValidationError, match="notr degil"):
-        config_yukle(PROFIL, gecersiz_kilma={
+        load_config(PROFIL, gecersiz_kilma={
             "senaryo.rejimler": [
                 {"ad": "baz", "aciklama": "x", "guncelleme_beklentisi_hafta": 26.0,
                  "referans_kur_artisi": 0.10, "fiyat_gecis_katsayisi": 0.5,
@@ -56,25 +56,25 @@ def test_butun_rejimler_notrse_katman_olu():
             "referans_kur_artisi": 0.0, "fiyat_gecis_katsayisi": 0.0,
             "antisipasyon_talep_carpani": 1.0, "fonlama_orani_carpani": 1.0}
     with pytest.raises(ValidationError, match="senaryo katmani olu"):
-        config_yukle(PROFIL, gecersiz_kilma={
+        load_config(PROFIL, gecersiz_kilma={
             "senaryo.rejimler": [{"ad": "baz"} | notr, {"ad": "ikinci"} | notr]})
 
 
 def test_taban_ad_rejimler_icinde_olmali():
     with pytest.raises(ValidationError, match="taban_ad"):
-        config_yukle(PROFIL, gecersiz_kilma={"senaryo.taban_ad": "olmayan"})
+        load_config(PROFIL, gecersiz_kilma={"senaryo.taban_ad": "olmayan"})
 
 
 def test_politika_adi_dogrulaniyor():
     """Kodun tanimadigi politika adi sessizce atlanmaz."""
     with pytest.raises(ValidationError, match="senaryo.politika tanimsiz"):
-        config_yukle(PROFIL, gecersiz_kilma={"senaryo.politika": "yok_boyle"})
+        load_config(PROFIL, gecersiz_kilma={"senaryo.politika": "yok_boyle"})
 
 
 def test_teklif_yok_politikasi_reddediliyor():
     """Hic teklif vermeyen politikanin rejim duyarliligi tanimi geregi sifir."""
     with pytest.raises(ValidationError, match="senaryo.politika tanimsiz"):
-        config_yukle(PROFIL, gecersiz_kilma={"senaryo.politika": "teklif_yok"})
+        load_config(PROFIL, gecersiz_kilma={"senaryo.politika": "teklif_yok"})
 
 
 # --------------------------------------------------------------------------
@@ -159,8 +159,8 @@ def test_fonlama_carpani_yalnizca_fonlamayi_oynatiyor(cfg):
 
 
 def test_rejim_config_diger_gecersiz_kilmalari_korur():
-    """`config_yukle` ile yeniden okunsaydi sweep'in knob'i silinirdi."""
-    cfg = config_yukle(PROFIL, gecersiz_kilma={
+    """`load_config` ile yeniden okunsaydi sweep'in knob'i silinirdi."""
+    cfg = load_config(PROFIL, gecersiz_kilma={
         "politika.kisit.eczane_haftalik_teklif_tavani": 3})
     yeni = sc.rejim_config(cfg, cfg.senaryo.rejim("sok"))
     assert yeni.politika.kisit.eczane_haftalik_teklif_tavani == 3

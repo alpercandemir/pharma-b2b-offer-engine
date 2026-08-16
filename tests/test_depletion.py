@@ -11,8 +11,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from core.config import config_yukle
-from core.io import Kosu
+from core.config import load_config
+from core.io import Run
 from eval import metrics as mt
 from eval.oracle import Oracle
 from experiments.run import kosu_yap, zaman_bolmesi
@@ -33,9 +33,9 @@ TEST_KNOBLARI = {
 
 @pytest.fixture(scope="module")
 def hazirlik(tmp_path_factory):
-    cfg = config_yukle("fast", gecersiz_kilma=TEST_KNOBLARI)
+    cfg = load_config("fast", gecersiz_kilma=TEST_KNOBLARI)
     kok = tmp_path_factory.mktemp("dunya")
-    dunya_yaz(cfg, Kosu("t", kok=kok))
+    dunya_yaz(cfg, Run("t", kok=kok))
     izg = izgara_kur(GozlemlenebilirKaynak("t", kok=kok), cfg)
     panel = panel_kur(izg, cfg)
     return cfg, kok, izg, panel, zaman_bolmesi(panel, cfg, izg.W)
@@ -131,7 +131,7 @@ def test_zaman_bolmesi_tamponlu(hazirlik):
 
 def test_kosu_tekrar_uretilebilir(tmp_path):
     """Ayni config + ayni seed -> ayni metrikler (CLAUDE.md 5)."""
-    cfg = config_yukle("fast", gecersiz_kilma=TEST_KNOBLARI)
+    cfg = load_config("fast", gecersiz_kilma=TEST_KNOBLARI)
     a = kosu_yap(cfg, "tekrar_a", {}, veri_tut=False, tahmin_yaz=False, kok=tmp_path)
     b = kosu_yap(cfg, "tekrar_b", {}, veri_tut=False, tahmin_yaz=False, kok=tmp_path)
     # NaN == NaN yanlistir; tanimsiz metrik (orn. sifir teklifli politikanin

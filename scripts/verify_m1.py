@@ -22,9 +22,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
 
-from core.config import config_yukle  # noqa: E402
-from core.io import LATENT_KOLONLAR, Kosu  # noqa: E402
-from core.rng import SeedBankasi  # noqa: E402
+from core.config import load_config  # noqa: E402
+from core.io import LATENT_COLUMNS, Run  # noqa: E402
+from core.rng import SeedBank  # noqa: E402
 from sim.calendar import GUN_HAFTA  # noqa: E402
 from sim.world import dunya_kos  # noqa: E402
 
@@ -56,16 +56,16 @@ def _sekil_kaydet(ad: str) -> Path:
 
 
 # --------------------------------------------------------------------------
-def kontrol_olcek(kosu: Kosu, cfg) -> Kontrol:
-    u = kosu.oku_gozlemlenebilir("urunler").height
-    e = kosu.oku_gozlemlenebilir("eczaneler").height
-    w = kosu.oku_gozlemlenebilir("takvim").height
+def kontrol_olcek(kosu: Run, cfg) -> Kontrol:
+    u = kosu.read_observable("urunler").height
+    e = kosu.read_observable("eczaneler").height
+    w = kosu.read_observable("takvim").height
     gecti = (e, u, w) == (cfg.profil.eczane_sayisi, cfg.profil.sku_sayisi, cfg.profil.hafta_sayisi)
     return Kontrol("Olcek (eczane x SKU x hafta)", gecti, f"{e} x {u} x {w}")
 
 
-def kontrol_seyreklik(kosu: Kosu, cfg) -> tuple[Kontrol, Kontrol]:
-    h = kosu.oku_gercek("hucre_haftalik")
+def kontrol_seyreklik(kosu: Run, cfg) -> tuple[Kontrol, Kontrol]:
+    h = kosu.read_ground_truth("hucre_haftalik")
     P, S, W = cfg.profil.eczane_sayisi, cfg.profil.sku_sayisi, cfg.profil.hafta_sayisi
     toplam_hucre = P * S * W
     sifir_olmayan = (h["gercek_tuketim"] > 0).sum()
@@ -126,13 +126,13 @@ def kontrol_seyreklik(kosu: Kosu, cfg) -> tuple[Kontrol, Kontrol]:
     return k1, k2
 
 
-def kontrol_durgunluk(kosu: Kosu, cfg) -> tuple[Kontrol, Kontrol]:
+def kontrol_durgunluk(kosu: Run, cfg) -> tuple[Kontrol, Kontrol]:
     """Dunyanin istenmeyen sistematik kaymasi var mi?
 
     Ikisi de M1 kabul edildikten SONRA bulunan gercek hatalardi (bkz.
     reports/m1.md 3.6-3.8); bir daha sessizce geri gelmesinler diye kontrol.
     """
-    h = kosu.oku_gercek("hucre_haftalik")
+    h = kosu.read_ground_truth("hucre_haftalik")
     W = cfg.profil.hafta_sayisi
     g = (h.group_by("hafta").agg(pl.col("cesitte_var").sum().alias("aktif")).sort("hafta"))
     seri = g["aktif"].to_numpy().astype(float)
@@ -167,15 +167,15 @@ def kontrol_durgunluk(kosu: Kosu, cfg) -> tuple[Kontrol, Kontrol]:
     )
 
 
-def kontrol_iade_kuplaji(kosu: Kosu) -> Kontrol:
+def kontrol_iade_kuplaji(kosu: Run) -> Kontrol:
     """Iade tuketim hiziyla kupleli mi, yoksa duz bir gun esigi mi?
 
     SPEC 2.5: ayni kalan raf omru, yavas eczane icin zayi, hizli eczane icin
     sorun degil. Iade orani hucre hizina gore AZALMALI.
     """
-    ia = kosu.oku_gozlemlenebilir("iadeler")
-    h = kosu.oku_gercek("hucre_haftalik").filter(pl.col("cesitte_var"))
-    sevk = kosu.oku_gozlemlenebilir("sevkiyat_satirlari")
+    ia = kosu.read_observable("iadeler")
+    h = kosu.read_ground_truth("hucre_haftalik").filter(pl.col("cesitte_var"))
+    sevk = kosu.read_observable("sevkiyat_satirlari")
     if ia.height == 0:
         return Kontrol("Iade tuketim hiziyla kupleli", False, "hic iade olusmadi")
 
@@ -211,10 +211,10 @@ def kontrol_iade_kuplaji(kosu: Kosu) -> Kontrol:
     )
 
 
-def kontrol_mevsimsellik(kosu: Kosu, cfg) -> Kontrol:
-    h = kosu.oku_gercek("hucre_haftalik")
-    urun = kosu.oku_gozlemlenebilir("urunler").select(["sku_id", "kategori_kod"])
-    takvim = kosu.oku_gozlemlenebilir("takvim").select(["hafta", "ay"])
+def kontrol_mevsimsellik(kosu: Run, cfg) -> Kontrol:
+    h = kosu.read_ground_truth("hucre_haftalik")
+    urun = kosu.read_observable("urunler").select(["sku_id", "kategori_kod"])
+    takvim = kosu.read_observable("takvim").select(["hafta", "ay"])
     birlesik = h.join(urun, on="sku_id").join(takvim, on="hafta")
     aylik = (
         birlesik.group_by(["kategori_kod", "ay"])
@@ -264,13 +264,13 @@ def _etkilenen_skular(satir: dict, urun: pl.DataFrame) -> list[str]:
     return satir["hedef"].split(",")
 
 
-def kontrol_olay_etkisi(kosu: Kosu, cfg) -> Kontrol:
+def kontrol_olay_etkisi(kosu: Run, cfg) -> Kontrol:
     """Olay etudu. Sadece ETKILENEN SKU'lar uzerinden; tum evren uzerinden
     olculurse tek kategoriye vuran olaylar sulanip gorunmez olur."""
-    h = kosu.oku_gercek("hucre_haftalik")
-    olaylar = kosu.oku_gercek("olaylar_gercek")
-    siparis = kosu.oku_gozlemlenebilir("siparisler")
-    urun = kosu.oku_gozlemlenebilir("urunler").select(["sku_id", "kategori_kod"])
+    h = kosu.read_ground_truth("hucre_haftalik")
+    olaylar = kosu.read_ground_truth("olaylar_gercek")
+    siparis = kosu.read_observable("siparisler")
+    urun = kosu.read_observable("urunler").select(["sku_id", "kategori_kod"])
     W = cfg.profil.hafta_sayisi
 
     tuketim_sku = (h.group_by(["sku_id", "hafta"]).agg(pl.col("gercek_tuketim").sum())
@@ -342,11 +342,11 @@ def kontrol_olay_etkisi(kosu: Kosu, cfg) -> Kontrol:
                    gecti, " | ".join(parcalar))
 
 
-def kontrol_fefo(kosu: Kosu, cfg) -> tuple[Kontrol, Kontrol]:
-    lotlar = kosu.oku_gozlemlenebilir("stok_lotlari")
-    sevk = kosu.oku_gozlemlenebilir("sevkiyat_satirlari")
-    latent = kosu.oku_gercek("latent_eczane").select(["eczane_id", "miad_toleransi_gun"])
-    urun = kosu.oku_gozlemlenebilir("urunler").select(["sku_id", "kategori_kod"])
+def kontrol_fefo(kosu: Run, cfg) -> tuple[Kontrol, Kontrol]:
+    lotlar = kosu.read_observable("stok_lotlari")
+    sevk = kosu.read_observable("sevkiyat_satirlari")
+    latent = kosu.read_ground_truth("latent_eczane").select(["eczane_id", "miad_toleransi_gun"])
+    urun = kosu.read_observable("urunler").select(["sku_id", "kategori_kod"])
     kat_carpan = {k.kod: k.miad_toleransi_carpani for k in cfg.urun.kategoriler}
 
     s = (sevk.join(latent, on="eczane_id").join(urun, on="sku_id")
@@ -388,7 +388,7 @@ def kontrol_fefo(kosu: Kosu, cfg) -> tuple[Kontrol, Kontrol]:
             break
         bakiye[lid] -= r["adet"]
 
-    imha = kosu.oku_gozlemlenebilir("imhalar")
+    imha = kosu.read_observable("imhalar")
     fig, ax = plt.subplots(1, 3, figsize=(13, 3.8))
     ax[0].hist(sevk["kalan_raf_omru_gun"].to_numpy(), bins=50, color="#3b6ea5")
     ax[0].set_title("Sevkiyatta kalan raf omru (gun)")
@@ -413,10 +413,10 @@ def kontrol_fefo(kosu: Kosu, cfg) -> tuple[Kontrol, Kontrol]:
     return k1, k2
 
 
-def kontrol_miad_toleransi_canli(kosu: Kosu) -> Kontrol:
+def kontrol_miad_toleransi_canli(kosu: Run) -> Kontrol:
     """miad_toleransi olu bir alan mi, yoksa gercekten karari degistiriyor mu?"""
-    o = kosu.oku_gozlemlenebilir("siparisler")
-    latent = kosu.oku_gercek("latent_eczane").select(["eczane_id", "miad_toleransi_gun"])
+    o = kosu.read_observable("siparisler")
+    latent = kosu.read_ground_truth("latent_eczane").select(["eczane_id", "miad_toleransi_gun"])
     toplam = o["talep_adet"].sum()
     red = o["miad_kisiti_nedeniyle_verilemeyen"].sum()
     ecz = (o.group_by("eczane_id")
@@ -441,11 +441,11 @@ def kontrol_miad_toleransi_canli(kosu: Kosu) -> Kontrol:
     )
 
 
-def kontrol_sizinti(kosu: Kosu) -> Kontrol:
+def kontrol_sizinti(kosu: Run) -> Kontrol:
     ihlaller = []
-    for ad in kosu.tablolar()["observable"]:
-        kolonlar = set(kosu.oku_gozlemlenebilir(ad).columns)
-        for k in sorted(kolonlar & LATENT_KOLONLAR):
+    for ad in kosu.tables()["observable"]:
+        kolonlar = set(kosu.read_observable(ad).columns)
+        for k in sorted(kolonlar & LATENT_COLUMNS):
             ihlaller.append(f"{ad}.{k}")
     return Kontrol("Gozlemlenebilir katmanda latent kolon yok", not ihlaller,
                    f"{len(ihlaller)} ihlal" + (f": {ihlaller}" if ihlaller else ""))
@@ -454,7 +454,7 @@ def kontrol_sizinti(kosu: Kosu) -> Kontrol:
 def kontrol_determinizm(cfg) -> Kontrol:
     """Ayni seed -> ayni dunya. Iki kez uret, ozetleri karsilastir."""
     def _ozet():
-        d = dunya_kos(cfg, SeedBankasi(cfg.profil.temel_seed))
+        d = dunya_kos(cfg, SeedBank(cfg.profil.temel_seed))
         return (
             d.siparisler.height, int(d.siparisler["talep_adet"].sum()),
             d.sevkiyat_satirlari.height, int(d.sevkiyat_satirlari["adet"].sum()),
@@ -467,10 +467,10 @@ def kontrol_determinizm(cfg) -> Kontrol:
 
 
 # --------------------------------------------------------------------------
-def _kosu_metrikleri(k: Kosu) -> dict[str, float]:
-    h = k.oku_gercek("hucre_haftalik")
-    o = k.oku_gozlemlenebilir("siparisler")
-    i = k.oku_gozlemlenebilir("imhalar")
+def _kosu_metrikleri(k: Run) -> dict[str, float]:
+    h = k.read_ground_truth("hucre_haftalik")
+    o = k.read_observable("siparisler")
+    i = k.read_observable("imhalar")
     aktif = h.filter(pl.col("cesitte_var"))
     talep = float(o["talep_adet"].sum())
     karsilanan = float(o["karsilanan_adet"].sum())
@@ -487,7 +487,7 @@ def _kosu_metrikleri(k: Kosu) -> dict[str, float]:
         "karsilama_orani": karsilanan / max(talep, 1),
         "miad_reddi_orani": float(o["miad_kisiti_nedeniyle_verilemeyen"].sum()) / max(talep, 1),
         "imha_orani": imha / max(karsilanan + imha, 1),
-        "iade_orani": (float(k.oku_gozlemlenebilir("iadeler")["iade_adet"].sum())
+        "iade_orani": (float(k.read_observable("iadeler")["iade_adet"].sum())
                        / max(karsilanan, 1)),
         "eczane_kayip_talep_orani": kayip / max(kayip + tuketim, 1),
     }
@@ -500,7 +500,7 @@ def knob_taramasi(profil: str, knob: str, degerler: list[str], seeds: int,
     Bu, M1 knob'larinin etkisini olcmek icin karsilastirmali kosu kosucusudur:
     her deger icin `seeds` adet farkli seed, metriklerin ortalamasi ve std'si.
     """
-    temel = config_yukle(profil).profil.temel_seed
+    temel = load_config(profil).profil.temel_seed
     sabit_args: list[str] = []
     for s in sabit or []:
         sabit_args += ["--knob", s]
@@ -514,7 +514,7 @@ def knob_taramasi(profil: str, knob: str, degerler: list[str], seeds: int,
                  "--seed", str(temel + j)] + sabit_args,
                 check=True, stdout=subprocess.DEVNULL,
             )
-            yigin.append(_kosu_metrikleri(Kosu("_tarama")))
+            yigin.append(_kosu_metrikleri(Run("_tarama")))
         satir: dict[str, object] = {"deger": deger}
         for ad in yigin[0]:
             v = np.array([y[ad] for y in yigin])
@@ -549,10 +549,10 @@ def main() -> None:
                       args.degerler.split(","), args.seeds, args.sabit)
         return
 
-    kosu = Kosu(args.kosu)
-    manifest = kosu.manifest_oku()
+    kosu = Run(args.kosu)
+    manifest = kosu.read_manifest()
     profil = args.profil or manifest["profil"]
-    cfg = config_yukle(profil)
+    cfg = load_config(profil)
     print(f"kosu={args.kosu} profil={profil} config_hash={manifest['config_hash']}")
 
     kontroller: list[Kontrol] = [kontrol_olcek(kosu, cfg)]

@@ -29,8 +29,8 @@ import polars as pl
 
 from policy.candidates import AdayDunyasi, OriginGorunumu
 
-KOK = Path(__file__).resolve().parent.parent
-VERI_DIZINI = KOK / "data"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = REPO_ROOT / "data"
 
 # "Ust dilim" = en yuksek skorlu %10. eval/metrics.py'deki `ust_dilim_kazanci`
 # ile ayni dilim; iki metrik ayni yeri isaret etsin diye. Olcum tanimi, knob degil.
@@ -69,7 +69,7 @@ def oracle_hedef(kosu_adi: str, dunya: AdayDunyasi, gor: OriginGorunumu,
 
     Tedarikciden bagimsiz gercek ihtiyac. Yalnizca olcumde kullanilir.
     """
-    yol = (kok or VERI_DIZINI) / kosu_adi / "ground_truth" / "hucre_haftalik.parquet"
+    yol = (kok or DATA_DIR) / kosu_adi / "ground_truth" / "hucre_haftalik.parquet"
     h = (pl.read_parquet(yol, columns=["hafta", "eczane_id", "sku_id", "gercek_tuketim"])
          .filter((pl.col("hafta") > gor.t) & (pl.col("hafta") <= gor.t + ufuk)
                  & (pl.col("gercek_tuketim") > 0)))

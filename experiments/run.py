@@ -37,9 +37,9 @@ import polars as pl
 
 from agent import scenario as ag_senaryo
 from agent import tools as ag_arac
-from core.config import Config, config_yukle
-from core.io import Kosu
-from core.rng import SeedBankasi
+from core.config import Config, load_config
+from core.io import Run
+from core.rng import SeedBank
 from eval import aday as ev_aday
 from eval import allocation as ev_tahsis
 from eval import metrics as mt
@@ -68,8 +68,8 @@ from sim.response import (GercekDurum, beklenen_miktar_carpani, sonuc_ornekle,
                           tepki_evreni_kur, tepki_hesapla)
 from sim.world import dunya_kur, hafta_adimi
 
-KOK = Path(__file__).resolve().parent.parent
-KOSU_DIZINI = KOK / "experiments" / "runs"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+KOSU_DIZINI = REPO_ROOT / "experiments" / "runs"
 ASAMALAR = ("m2", "m3", "m4", "m5", "m6", "m7")
 
 
@@ -570,7 +570,7 @@ def m4_boru_hatti(cfg: Config, kosu_adi: str, kok: Path) -> M4Ciktisi:
     kaynak = GozlemlenebilirKaynak(kosu_adi, kok=kok)
     dunya = pol_aday.dunya_yukle(kaynak, cfg)
     td = ft.teklif_dunyasi_yukle(kaynak, cfg, dunya)
-    seedler = SeedBankasi(cfg.profil.temel_seed)
+    seedler = SeedBank(cfg.profil.temel_seed)
     durum = GercekDurum(kosu_adi, kok=kok)
     evren = tepki_evreni_kur(cfg, seedler, dunya.eczaneler, dunya.urunler,
                              durum.latent_eczane)
@@ -1125,7 +1125,7 @@ def m6_kayit_verisi(cfg: Config, m4: M4Ciktisi) -> tuple:
     for r in range(cfg.ope.kayit.tekrar_sayisi):
         # Her tekrar KENDI seed bankasi: ayni satirlar, farkli aksiyon ve
         # farkli kabul zarlari.
-        seedler = SeedBankasi(cfg.ope.kayit.seed + r)
+        seedler = SeedBank(cfg.ope.kayit.seed + r)
         for blok, tepki in zip(m4.bloklar, m4.tepkiler):
             n = blok.teklifler.height
             if n == 0:
@@ -1262,7 +1262,7 @@ def m6_rollout(cfg: Config, m4: M4Ciktisi) -> dict[str, rl.RolloutOlcumu]:
     r = cfg.ope.rollout
     cikti: dict[str, rl.RolloutOlcumu] = {}
     for ad in r.politikalar:
-        durum = dunya_kur(cfg, SeedBankasi(cfg.profil.temel_seed))
+        durum = dunya_kur(cfg, SeedBank(cfg.profil.temel_seed))
         for _ in range(r.baslangic_hafta):
             hafta_adimi(durum)
         karar = (None if ad == "teklif_yok"
@@ -1479,7 +1479,7 @@ def kosu_yap(cfg: Config, kosu_id: str, gecersiz: dict, veri_tut: bool,
     dizin.mkdir(parents=True)
 
     t0 = time.perf_counter()
-    dunya = Kosu("dunya", kok=dizin)
+    dunya = Run("dunya", kok=dizin)
     dunya_manifest = dunya_yaz(cfg, dunya, gecersiz)
     dunya_sn = round(time.perf_counter() - t0, 2)
 
@@ -1708,7 +1708,7 @@ def main() -> None:
     gecersiz = knob_ayristir(args.knob)
     if args.seed is not None:
         gecersiz["profil.temel_seed"] = args.seed
-    cfg = config_yukle(args.profil, gecersiz_kilma=gecersiz)
+    cfg = load_config(args.profil, gecersiz_kilma=gecersiz)
     kosu_id = args.ad or f"{cfg.profil.ad}_{cfg.hash()[:8]}_{cfg.profil.temel_seed}"
 
     icerik = kosu_yap(cfg, kosu_id, gecersiz, args.veri_tut, not args.tahmin_yazma,

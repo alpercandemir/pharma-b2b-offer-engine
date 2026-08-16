@@ -11,7 +11,7 @@ import numpy as np
 import polars as pl
 
 from core.config import Config, Kategori
-from core.rng import SeedBankasi, agirlikli_secim
+from core.rng import SeedBank, weighted_choice
 
 # ATC kodu son iki hanesi 01..99 arasindadir. Format sabiti.
 ATC_SIRA_MAX = 99
@@ -49,8 +49,8 @@ def _kategori_atamalari(cfg: Config, rng: np.random.Generator) -> np.ndarray:
     return idx
 
 
-def urun_evreni_kur(cfg: Config, seedler: SeedBankasi) -> tuple[pl.DataFrame, pl.DataFrame]:
-    rng = seedler.uretec("urun_evreni")
+def urun_evreni_kur(cfg: Config, seedler: SeedBank) -> tuple[pl.DataFrame, pl.DataFrame]:
+    rng = seedler.generator("urun_evreni")
     S = cfg.profil.sku_sayisi
     kategoriler: list[Kategori] = cfg.urun.kategoriler
     kat_idx = _kategori_atamalari(cfg, rng)
@@ -68,7 +68,7 @@ def urun_evreni_kur(cfg: Config, seedler: SeedBankasi) -> tuple[pl.DataFrame, pl
         n_inn = max(1, int(round(n_kat * kat.etken_madde_orani)))
         inn_havuzu[kat.kod] = [f"{kat.kod}-INN-{j:02d}" for j in range(n_inn)]
 
-    koli_secim = agirlikli_secim(
+    koli_secim = weighted_choice(
         rng, cfg.urun.evren.koli_ici_adet_secenekleri,
         cfg.urun.evren.koli_ici_adet_agirliklari, S,
     )

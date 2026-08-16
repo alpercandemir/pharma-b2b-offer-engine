@@ -22,7 +22,7 @@ import pytest
 
 from agent import narrative as nv
 from agent import tools as at
-from core.config import config_yukle
+from core.config import load_config
 from harness import denetim as dn
 from harness import mutasyon as mt
 from harness import run as hr
@@ -34,7 +34,7 @@ KOSU = "dunya"
 
 @pytest.fixture(scope="module")
 def cfg():
-    return config_yukle(PROFIL)
+    return load_config(PROFIL)
 
 
 @pytest.fixture()
@@ -192,7 +192,7 @@ def test_tolerans_mutasyon_sapmasini_gecemez():
     """Tolerans genisse bozulmus sayi da 'eslesti' sayilir: denetci olur."""
     from pydantic import ValidationError
     with pytest.raises(ValidationError, match="denetcisi olu"):
-        config_yukle(PROFIL, gecersiz_kilma={
+        load_config(PROFIL, gecersiz_kilma={
             "harness.sayi_toleransi_bagil": 0.30,
             "harness.mutasyon_sapmasi": 0.25})
 
@@ -207,11 +207,11 @@ def gercek(cfg, tmp_path_factory):
     Pahali (M4 ogreticisi egitiliyor) ama SART: elle kurulmus baglam
     denetcinin mantigini gosterir, gercek olgu paketiyle calistigini degil.
     """
-    from core.io import Kosu
+    from core.io import Run
     from scripts.generate_world import dunya_yaz
 
     kok = tmp_path_factory.mktemp("m7")
-    dunya_yaz(cfg, Kosu(KOSU, kok=kok))
+    dunya_yaz(cfg, Run(KOSU, kok=kok))
     return hr.baglam_hazirla(cfg, KOSU, kok)
 
 
