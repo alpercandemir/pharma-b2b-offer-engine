@@ -1,0 +1,17 @@
+# Olcek profili: sweep ve regresyon kosulari icin kucuk dunya.
+# M1 cikis kriterini DOGRULAMAZ; sadece hizli iterasyon ve testler icindir.
+# Hangi sonucun hangi profilde kostugu her raporda yazilir.
+#
+# M2'de hafta sayisi 52 -> 104'e cikarildi. Gerekce: M2'nin zaman bolmesi
+# (isinma 26 hafta + ufuk 12 + egitim/test tamponu 12) 52 haftaya sigmiyor,
+# test kumesi bos kaliyordu. Kesit (eczane x SKU) 40x60'tan 60x100'e cikti ki
+# panelde sweep gurultusunu tasiyacak kadar hucre olsun. Zaman ekseni artik
+# `full` ile ayni yapida: mevsimsellik ve olay katmani ayni sekilde isliyor,
+# yalnizca kesit kucuk.
+profil:
+  ad: fast
+  eczane_sayisi: 60
+  sku_sayisi: 100
+  hafta_sayisi: 104
+  baslangic_tarihi: "2024-08-05"
+  temel_seed: 20260812

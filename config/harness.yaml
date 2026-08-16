@@ -1,0 +1,43 @@
+# M7 eval harness. SPEC M7 cikis kriteri:
+#
+#   "Eval harness'ta LLM ciktisi DETERMINISTIK olarak test ediliyor --
+#    hallusinasyon, kisit ihlali iddiasi, sayi uydurma yakalaniyor."
+#
+# DENETCININ CANLI OLDUGU NASIL BILINIR. M5'in "temizlik penceresi bos,
+# rejim olu" ve M6'nin "ortusme esigi tabanin altinda, teshis olu"
+# kilitleriyle ayni soru: hicbir seyi yakalamayan bir denetci, sorunun
+# yoklugunu degil OLCUNUN yoklugunu gosterir. Bu yuzden harness yalnizca
+# temiz ciktiyi degil, temiz ciktidan uretilmis BOZUK varyantlari da kosar
+# (harness/mutasyon.py) ve her mutasyonun yakalanmasini SART kosar.
+#
+# `sayi_toleransi_bagil` ile `mutasyon_sapmasi` arasindaki iliski bu yuzden
+# mekanik olarak kilitli (core/config.py `_m7_harness_kilidi`): tolerans
+# mutasyon sapmasini yakalayamayacak kadar genisse sayi denetcisi olur ve
+# harness sessizce "her sey temiz" der.
+
+harness:
+  # Metindeki bir sayinin defterdeki bir sayiyla eslesmis sayilmasi icin
+  # izin verilen BAGIL fark. Sifir olamaz: brifing sayilari yuvarlanmis
+  # yazilir ("1.234,5 TL"), defterdekiler tam.
+  sayi_toleransi_bagil: 0.005
+
+  # Mutasyon uretecinin bir sayiyi bozarken uyguladigi bagil sapma.
+  # Toleranstan belirgin biçimde buyuk olmali; kilit bunu zorluyor.
+  mutasyon_sapmasi: 0.25
+
+  # Bu degerin ALTINDAKI tamsayilar sayi denetiminde yoksayilir.
+  # Varsayilan 0 = yoksayma yok, her sayi hesap veriyor. Buyutmek denetciyi
+  # korlestirir: "3 eczanede" gibi uydurulmus kucuk tamsayilar gorunmez
+  # olur. Madde numarasi / baslik numarasi zaten metinden ayiklaniyor
+  # (harness/denetim.py), bu yuzden 0 calisiyor.
+  yoksayilan_tamsayi_ust_siniri: 0
+
+  # Sayilarin defterle karsilastirilmadan once yuvarlanabilecegi ondalik
+  # basamak adaylari. Brifing "0,35" yazarken defterde "0,3462" durabilir;
+  # bu liste hangi yuvarlamalarin mesru sayildigini soyler.
+  yuvarlama_basamaklari: [0, 1, 2, 3, 4]
+
+  # Bir vakada kabul edilebilir azami bulgu sayisi ASILDIGINDA kosu duser.
+  # Temiz vakada 0 beklenir; mutant vakalarda beklenen bulgu listesi
+  # cases.yaml'da yazili ve bu tavan uygulanmaz.
+  temiz_vaka_bulgu_tavani: 0

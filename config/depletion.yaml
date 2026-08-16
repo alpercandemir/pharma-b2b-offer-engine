@@ -1,0 +1,67 @@
+# M2 tukenme (hazard) modeli. SPEC M2 + D2.
+#
+# D2: "Ayni urunu yeni alana onerme" bir exclusion rule degil, bir tahmin
+# problemidir. Dogru soru "aldi mi" degil, "eldeki stogu ne zaman bitecek".
+#
+# EGITIM HEDEFI ile DEGERLENDIRME HEDEFI ayni sey DEGILDIR (reports/m1.md 8):
+#   egitim  (gozlemlenebilir): bir sonraki siparisin BIZE gelme zamani.
+#                              Sagdan sansurlu ve share_of_wallet ile seyreltilmis.
+#   olcum   (oracle):          eczanenin gercek stok sifirlanma haftasi.
+#                              ground_truth/ altinda; modele KAPALI, sadece denetim.
+# Bu dosyadaki hicbir knob oracle etiketini egitime sokmaz; tek istisna
+# `degerlendirme.oracle_teshisi` ve o bir TESHIS kosusudur, teslim edilen
+# model degildir.
+
+hedef:
+  # Ayrik zamanli hazard'in ufku (hafta). Model h(k), k = 1..bu icin ogrenir.
+  # Tahmin edilen tukenme suresi bu ufukta kirpilir (restricted mean).
+  ufuk_hafta: 12
+  # Karar ufku: "onumuzdeki bu kadar hafta icinde tukenir mi" sorusunun ufku.
+  # AUC / PR-AUC / kalibrasyon bu ufukta olculur. Teklif karari bu soruya
+  # baglanacak (M4).
+  karar_ufku_hafta: 4
+  # Egitim ve test origin'leri arasinda birakilan bosluk (hafta). Egitim
+  # etiketi ufuk kadar ileri bakar; bosluk olmazsa egitim etiketi test
+  # penceresine tasar. `ufuk_hafta`dan kucuk olamaz (config dogrulamasi).
+  sinir_tamponu_hafta: 12
+
+model:
+  # Ayrik zamanli hazard: kisi-periyot tablosunda binary siniflandirma.
+  # LightGBM yerine sklearn HistGradientBoosting kullaniliyor - ayni histogram
+  # tabanli GBDT ailesi, ek sistem bagimliligi (libomp) yok. Gerekce m2.md 6'da.
+  ogrenme_orani: 0.06
+  azami_agac: 400
+  azami_yaprak: 31
+  min_yaprak_ornegi: 80
+  l2_duzenlilestirme: 1.0
+  ozellik_orani: 0.80
+  erken_durdurma: true
+  dogrulama_orani: 0.10
+  sabir: 25
+  seed: 11
+  # Kisi-periyot tablosunun satir tavani. Asilirsa (hucre, origin) ciftleri
+  # seed'li olarak alt orneklenir - periyotlar bolunmez. 0 = sinirsiz.
+  azami_egitim_satiri: 1500000
+
+taban_kural:
+  # D2'nin karsisina koydugu naif kural: "son N gunde aldi mi".
+  # Aldiysa "stogu var" kabul edilir, almadiysa "tukendi" kabul edilir.
+  son_n_gun: 30
+  # Kurala en iyi sansi vermek icin N egitim doneminde bu adaylar arasindan
+  # secilir (karar ufkunda AUC'yi maksimize eden). Sabit 30 ile karsilastirmak
+  # kurali haksiz yere zayif gosterirdi.
+  n_gun_adaylari: [7, 14, 21, 30, 45, 60, 90]
+
+degerlendirme:
+  # Kalibrasyon egrisi kova sayisi (esit frekansli).
+  kalibrasyon_kova_sayisi: 10
+  # Metrik farklarinin guven araligi icin bootstrap tekrari (compare.py).
+  bootstrap_orneklem: 300
+  bootstrap_seed: 7
+  # TESHIS kosulari (teslim edilen model degil, tavan olcumu):
+  #   - oracle ETIKET modeli : gercek tukenme etiketiyle egitilmis hazard.
+  #     "Etiket korlugu ne kadara mal oluyor" sorusunu olcer.
+  #   - oracle OZELLIK modeli: gercek stok ve gercek hizla kurulmus kapsama.
+  #     "Ozellik korlugu ne kadara mal oluyor" sorusunu olcer.
+  # Kapatilirsa kosu hizlanir, m2.md 3.3'teki ayristirma uretilmez.
+  oracle_teshisi: true

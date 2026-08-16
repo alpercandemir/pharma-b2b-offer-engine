@@ -1,0 +1,9 @@
+# Olcek profili: M1 cikis kriterinin tanimladigi tam dunya.
+# 200 eczane x 300 SKU x 104 hafta.
+profil:
+  ad: full
+  eczane_sayisi: 200
+  sku_sayisi: 300
+  hafta_sayisi: 104
+  baslangic_tarihi: "2024-08-05"   # pazartesi; 104 hafta sonra 2026-07-27
+  temel_seed: 20260812

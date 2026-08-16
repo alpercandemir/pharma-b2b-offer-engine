@@ -1,0 +1,124 @@
+# Simulasyon sureci: talep, envanter, tedarikci secimi, bizim ikmalimiz.
+# CLAUDE.md 7: bu blok dunyanin ZORLUK ayaridir.
+
+takvim:
+  # Ramazan pencereleri (yaklasik). TEG/sindirim kategorilerinde talep kayar.
+  ramazan_pencereleri:
+    - { baslangic: "2024-03-11", bitis: "2024-04-09" }
+    - { baslangic: "2025-03-01", bitis: "2025-03-30" }
+    - { baslangic: "2026-02-17", bitis: "2026-03-19" }
+    - { baslangic: "2027-02-07", bitis: "2027-03-08" }
+  # Aralik: yil sonu SGK/katilim payi degisim beklentisi -> SIPARIS stoklamasi
+  # (tuketim degil). SPEC 2.3.
+  yil_sonu_stoklama_aylari: [12]
+  yil_sonu_stoklama_yogunlugu: 0.25      # antisipasyon siddeti 0..1 olceginde
+
+talep:
+  cesitlendirme:
+    # Bir eczanenin bir SKU'yu listesine alma olasiligi (yapisal sifirlar).
+    taban_oran: 0.16
+    populerlik_agirligi: 1.00
+    affinite_agirligi: 1.30
+    buyukluk_agirligi: 0.60
+    # Cesit degisimi: liste zaman icinde kayar, gecmis kalibi eskitir.
+    #
+    # Iki kural:
+    # (1) Cikan hucre sayisi kadar yeni hucre eklenir (affinite agirlikli),
+    #     boylece cesit SEVIYESI durgun kalir, sadece KIMIN cesitte oldugu
+    #     degisir. Ekleme ve cikarma ayri olasiliklar olsaydi tabanlari farkli
+    #     oldugu icin (cesit disi grid cesitten cok daha buyuk) cesit orani
+    #     sistematik kayardi -- kayiyordu da: 104 haftada %15.8'den %32.8'e.
+    # (2) Cikis SADECE stogu tukenmis hucrelerde olabilir: eczaci elindeki mali
+    #     bitirmeden urunu listeden cikarmaz. Bu kosul olmadan cikan hucre tum
+    #     stogunu aninda iade ediyor ve iadelerin ~%67'si bu yapay kanaldan
+    #     geliyordu. Oran, stoksuz hucreler uzerinden uygulandigi icin
+    #     kosulsuz haldekinden buyuktur.
+    haftalik_churn_orani: 0.050
+    # Yeni listeye alinan hucrede eczanenin gecmisi yoktur: deneme miktari
+    # kadar alir ve satisla ogrenir. Talep tahmini bu adet uzerinden tohumlanir.
+    # (Koli ici adetten tohumlamak YANLIS olurdu: siparis adet bazinda veriliyor,
+    #  30'luk kolisi olan SKU'ya haftada 30 adetlik talep atfedilmis olurdu.)
+    yeni_cesit_deneme_adedi: 1.0
+
+  yogunluk:
+    taban_adet_hafta: 1.35               # ortalama aktif hucrenin haftalik tuketimi
+    hucre_gurultu_shape: 0.90            # gamma shape; dusuk = hucreler cok farkli
+
+  dagilim:
+    negbin_shape: 0.65                   # gamma-poisson karisim shape'i; dusuk = asiri yayilim
+    sifir_sisirme: 0.34                  # yapisal olmayan ek sifir olasiligi
+    kategori_hafta_soku_sigma: 0.22      # kategori x hafta korrele sok (log-normal)
+    eczane_hafta_soku_sigma: 0.18        # eczane x hafta korrele sok (log-normal)
+
+  nobet:
+    akut_carpani: 1.85                   # nobet gunu olan haftada akut kategoriler
+  turizm:
+    zirve_carpani: 2.40
+    zirve_aylari: [6, 7, 8]
+    omuz_carpani: 1.35
+    omuz_aylari: [5, 9]
+
+envanter:
+  tedarik_suresi_hafta: 1
+  emniyet_stogu_hafta: 1.00
+  # Intermittent talepte "hafta cinsi kapsama" tek basina yetmez: varyans
+  # ortalamadan cok buyuk. Emniyet stogu talep sapmasina baglanir.
+  emniyet_z_katsayisi: 1.30
+  talep_varyans_ewma_alfa: 0.15
+  # Azami kapsama tavani. Varyans gudumlu emniyet stogu patlamali talepte
+  # kararsizdir: stoksuzluk satisi sansurler -> mal gelince satis siçrar ->
+  # varyans tahmini patlar -> hedef stok patlar. Gercek envanter politikalari
+  # bu yuzden bir max-stok tavani tasir. Tavan olmadan hucreler 50+ haftalik
+  # stoga cikiyor (bkz. reports/m1.md).
+  azami_kapsama_hafta: 6.0
+  # Siparis ADET bazinda verilir, koli katina yuvarlanmaz. SPEC 2.1'de koli
+  # kati kurali MF oranlari icindir (M4), normal siparis icin degil.
+  minimum_siparis_adedi: 1
+  soguk_zincir_minimum_siparis_adedi: 5   # soguk zincirde min siparis kurali
+  talep_ewma_alfa: 0.25                  # eczanenin KENDI talep tahmini (latent degil, eczanenin ici)
+  baslangic_kapsama_hafta: 2.50
+  stoksuzlukta_acil_gozden_gecirme: true
+  antisipasyon_kapsama_kazanci: 5.00     # kapsama carpani = 1 + stokculuk * antisipasyon * bu
+  # Stoklama firsatci alimdir: eczane yeniden-siparis noktasinin USTUNDEYKEN de
+  # alir. Bu esik asilinca siparis karari icin nokta kosulu aranmaz.
+  antisipasyon_siparis_esigi: 0.25
+  # Stoklama carpaninin ust siniri. Bu olmadan carpan stokculuk_egilimi ile
+  # sinirsiz buyuyor ve max-stok tavani tam da gerektigi anda baglamaz hale
+  # geliyor (eczaneler 19 haftalik stoga cikiyordu). Sinir, ustune cikan
+  # eczaneleri esitler; heterojenligin korunmasi icin kazanc x medyan
+  # stokculuk'un bu sinirin altinda kalmasi gerekir.
+  antisipasyon_azami_carpan: 3.0
+  # Eczane stogu miad tasir: hucre basina bu kadar miad kovasi tutulur.
+  # Buyutmek hucre ici miad dagilimini daha sadik temsil eder, maliyeti bellek.
+  eczane_lot_bolme_sayisi: 4
+
+iade:
+  # SPEC 2.5 "alici tarafi direnci": eczaneye giden mal orada da yaslanir.
+  # Iade miktari SABIT BIR GUN ESIGINDEN degil, tuketim hizi kuplajindan cikar:
+  #     satabilecegi = gunluk_hiz x (kalan_gun - eczaci_guvenlik_marji)
+  # Bu esigin altinda kalan fazla iade edilir.
+  eczaci_guvenlik_marji_gun: 14    # eczaci miadin son gunune kadar satmayi beklemez
+  degerlendirme_esigi_gun: 60     # eczaci sadece bu pencereye giren stoga bakar
+  depoya_iade_orani: 0.70          # iadenin bize fiziken geri donen payi; gerisi eczanede zayi
+  kredi_orani: 0.80                # bize donen iadenin DSF uzerinden kredilendirilen payi
+  sow_cezasi: 0.08                 # iade/siparis oraniyla olcekli SOW cezasi
+  cesitten_cikarmada_iade: true    # eczane urunu listeden cikarinca kalan stok iade olur
+
+tedarikci_secimi:
+  # Multi-homing. Siparisin bize gelme olasiligi = share_of_wallet (+ gurultu).
+  siparis_gurultusu: 0.10
+  karsilanamayan_siparis_rakibe_gider: true
+  # Ceza, o haftaki karsilayamama ORANI ile carpilir (ikili bayrak degil).
+  stoksuzluk_sow_cezasi: 0.05
+  # Ortalamaya donus hizi: pay yapisal seviyesine haftada bu oranda geri ceker.
+  sow_toparlanma_hizi: 0.06
+  sow_rassal_yuruyus_sigma: 0.018        # SOW zamanla kayar; eski tahmin bayatlar
+
+ikmal:
+  # Bizim depomuzun satin alma davranisi.
+  periyot_hafta: 2
+  hedef_kapsama_hafta: 8.0
+  emniyet_z_katsayisi: 1.50            # depo tarafi emniyet stogu
+  baslangic_kapsama_hafta: 5.0
+  siparis_gurultusu_sigma: 0.20
+  minimum_parti_adet: 12

@@ -1,0 +1,36 @@
+# Lot ve miad ekonomisi. SPEC 2.5.
+# M1'de sadece lot uretimi, FEFO tuketimi ve imha olcumu var.
+# Salvage egrisi / temizlik rejimi M5'e ait, burada YOK.
+
+raf_omru:
+  # Uretimden itibaren toplam raf omru (gun), kategori-agnostik log-normal.
+  toplam_gun_log_ort: 6.55               # medyan ~700 gun (~23 ay)
+  toplam_gun_log_sigma: 0.42
+  min_gun: 180
+  max_gun: 1460
+  # Soguk zincir urunlerde raf omru daha kisa.
+  soguk_zincir_carpani: 0.55
+
+giris:
+  # Lot bize girerken raf omrunun ne kadari tuketilmis olur.
+  tuketilmis_oran_ort: 0.22
+  tuketilmis_oran_sigma: 0.12
+  # Bize giren parti raf omrunun en fazla bu kadarini tuketmis olabilir.
+  tuketilmis_oran_ust_sinir: 0.95
+  # Kisa miatli parti olasiligi: temizlik probleminin M5'te malzemesi olsun diye
+  # bilerek uretilir. Sifir yapilirsa imha olayi neredeyse yok olur.
+  kisa_miatli_parti_olasiligi: 0.03
+  kisa_miatli_kalan_gun_ort: 110.0
+  kisa_miatli_kalan_gun_sigma: 45.0
+  kisa_miatli_min_gun: 30
+
+maliyet:
+  # Lot birim maliyeti = DSF * (1 - depo_kar_marji) * lognormal(0, sigma).
+  # Marj kademesi products.yaml'da; burada sadece parti pazarligi gurultusu var.
+  parti_pazarligi_sigma: 0.035
+  imha_birim_maliyeti_dsf_orani: 0.08    # imha + iade islem maliyeti (SPEC 2.5)
+
+tahsis:
+  # FEFO, eczanenin miad toleransini ihlal etmeyen en erken miatli lottan verir.
+  fefo_aktif: true
+  miad_toleransi_uygulanir: true

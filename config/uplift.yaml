@@ -1,0 +1,69 @@
+# M4 CATE katmani: kayit politikasi (D7), T/X ogrenici ve olcum.
+#
+# Bu dosyadaki knob'lar POLITIKA ve MODEL tarafindadir; dunyayi degistirmezler
+# (core/config.py DUNYA_BOLUMLERI). config/response.yaml ile karistirilmamali:
+# orasi gercek tepki mekanizmasi, burasi onu OGRENME denemesi.
+
+uplift:
+  # --- Kayit politikasi (D7: "her gosterimde secim olasiligi loglanir") ---
+  # Egitim verisini ureten politika. Rassal olmasi SART degil, ama her
+  # aksiyonun her satirda POZITIF olasiligi olmak zorunda (overlap) - yoksa
+  # o kolda karsi-olgusal tahmin ekstrapolasyondur ve M6'nin OPE'si coker.
+  kayit:
+    # Teklif verme olasiligi = taban + skor_egilimi * (yuzdelik_skor - 0.5).
+    # Egilim SIFIR DEGIL: gercek loglar hep bir politikadan gelir ve o
+    # politika yuksek skorlu satirlara daha cok teklif verir. Confounding'i
+    # bilerek uretiyoruz; ogrenicilerin isi bunu duzeltmek.
+    teklif_taban_olasiligi: 0.42
+    skor_egilimi: 0.50
+    # Derin MF egilimi: eski kural "riskli/kucuk eczaneye daha derin MF".
+    # Kollara softmax agirligi verir; kollar arasi orneklem dengesizligini
+    # bu uretir ve X-ogrenicinin T'ye gore avantaji buradan dogar.
+    derin_mf_egilimi: 0.90
+    # Kesif payi: bu olasilikla aksiyon IZINLI kollar uzerinde duzgun secilir.
+    # Overlap garantisi budur: pi(a|x) >= kesif_orani / |izinli| > 0.
+    kesif_orani: 0.25
+    seed: 40230812
+
+  # --- Egitim / olcum bolmesi ---
+  # Zaman bazli: egitim origin'leri olcum origin'lerinden ONCE ve arada
+  # tampon var. Rassal bolme ayni hucrenin gelecegini egitime sizdirirdi.
+  egitim:
+    ilk_origin_hafta: 30
+    # 1 = her hafta bir kayit kosusu. Ardisik origin'ler buyuk olcude ayni
+    # hucreleri iceriyor, yani etkin orneklem satir sayisindan kucuk; buna
+    # ragmen kol basina destek belirleyici oldugu icin sikligi yuksek
+    # tutuyoruz (kol basina orneklem `m4.destek.kol_orneklemi_min`).
+    origin_araligi_hafta: 1
+    azami_origin_sayisi: 50
+    # Egitim ile olcum origin'leri arasinda birakilan bosluk (hafta).
+    sinir_tamponu_hafta: 4
+
+  # --- Ogrenici (T ve X ayni tabani paylasir) ---
+  model:
+    ogrenme_orani: 0.06
+    azami_agac: 220
+    azami_yaprak: 31
+    min_yaprak_ornegi: 40
+    l2_duzenlilestirme: 1.0
+    ozellik_orani: 0.8
+    erken_durdurma: true
+    dogrulama_orani: 0.12
+    sabir: 20
+    seed: 20260812
+    # Kol basina en az bu kadar ornek yoksa kol "destek disi" sayilir ve
+    # ogrenici o kolda kontrol modelini tekrar eder (uydurma yapmaz).
+    min_kol_orneklemi: 300
+
+  x_ogrenici:
+    # g(x) = pi_a / (pi_0 + pi_a) kirpma sinirlari. Kirpmasiz g -> 0 veya 1
+    # oldugunda birlestirme agirligi patlar.
+    egilim_kirpma_alt: 0.05
+    egilim_kirpma_ust: 0.95
+
+  degerlendirme:
+    bootstrap_orneklem: 300
+    bootstrap_seed: 20260812
+    # Politika karsilastirmasinda kullanilan olcum ufku yok: tepki ANI.
+    # Teklif basina marj tablosunda gosterilen dilim sayisi (Qini egrisi).
+    qini_dilim_sayisi: 10

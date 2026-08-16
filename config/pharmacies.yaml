@@ -1,0 +1,93 @@
+# Eczane evreni ve persona dagilimlari. SPEC 2.2.
+#
+# "latent_" onekli bloklar gozlemlenebilir katmana ASLA yazilmaz
+# (bkz. core/io.py LATENT_KOLONLAR ve tests/test_leakage.py).
+
+iller:
+  - { ad: "Istanbul",  pay: 0.30, turizm_olasiligi: 0.10, sosyoekonomik_ort: 0.55, sosyoekonomik_sigma: 0.20 }
+  - { ad: "Ankara",    pay: 0.13, turizm_olasiligi: 0.03, sosyoekonomik_ort: 0.55, sosyoekonomik_sigma: 0.16 }
+  - { ad: "Izmir",     pay: 0.11, turizm_olasiligi: 0.25, sosyoekonomik_ort: 0.55, sosyoekonomik_sigma: 0.17 }
+  - { ad: "Antalya",   pay: 0.09, turizm_olasiligi: 0.75, sosyoekonomik_ort: 0.50, sosyoekonomik_sigma: 0.18 }
+  - { ad: "Bursa",     pay: 0.07, turizm_olasiligi: 0.05, sosyoekonomik_ort: 0.48, sosyoekonomik_sigma: 0.15 }
+  - { ad: "Mugla",     pay: 0.05, turizm_olasiligi: 0.85, sosyoekonomik_ort: 0.52, sosyoekonomik_sigma: 0.18 }
+  - { ad: "Konya",     pay: 0.06, turizm_olasiligi: 0.02, sosyoekonomik_ort: 0.42, sosyoekonomik_sigma: 0.14 }
+  - { ad: "Gaziantep", pay: 0.06, turizm_olasiligi: 0.03, sosyoekonomik_ort: 0.38, sosyoekonomik_sigma: 0.14 }
+  - { ad: "Trabzon",   pay: 0.05, turizm_olasiligi: 0.20, sosyoekonomik_ort: 0.44, sosyoekonomik_sigma: 0.15 }
+  - { ad: "Adana",     pay: 0.08, turizm_olasiligi: 0.05, sosyoekonomik_ort: 0.43, sosyoekonomik_sigma: 0.16 }
+
+cografya:
+  ilce_sayisi_il_basina: 6
+  semt_sayisi_ilce_basina: 4
+
+konum:
+  # Hastane yakinligi. Yakinlik skoru = exp(-km / mesafe_olcegi_km), 0..1.
+  hastane_mesafesi_log_ort: 0.55        # ln(km); medyan ~1.7 km
+  hastane_mesafesi_log_sigma: 1.10
+  mesafe_olcegi_km: 1.50
+
+olcek:
+  # Eczane buyuklugu (talep carpani) log-normal.
+  buyukluk_log_sigma: 0.55
+  aylik_recete_taban: 1400              # ortalama buyuklukteki eczanenin aylik recete adedi
+  ciro_bandi_sinirlari: [0.6, 1.0, 1.6]  # buyukluk carpanina gore S/M/L/XL esikleri
+
+nobet:
+  rotasyon_periyodu_gun_secenekleri: [6, 7, 8, 9, 10]
+  rotasyon_periyodu_agirliklari: [0.15, 0.25, 0.25, 0.20, 0.15]
+
+kredi:
+  # Gozlemlenebilir. M3 kisit katmanini besleyecek, M1'de sadece uretilir.
+  vade_riski_ort: 0.35
+  vade_riski_sigma: 0.18
+  ortalama_recete_tutari: 320.0         # TL; dbs_limiti bunun uzerinden turetilir
+  dbs_limiti_carpani_ort: 2.4           # aylik ciro tahmininin kaci kadar limit
+  dbs_limiti_carpani_sigma: 0.7
+  dbs_limiti_carpani_min: 0.10          # negatif/sifir limit olusmasin diye taban
+
+recete_karmasi:
+  sgk_recete_orani_ort: 0.72
+  sgk_recete_orani_sigma: 0.12
+
+# --- LATENT persona parametreleri (model asla goremez) ---
+latent_share_of_wallet:
+  beta_a: 1.6
+  beta_b: 2.4                           # ort ~0.40: eczane 3-4 depoyla calisiyor
+  min: 0.05
+  max: 0.92
+
+latent_stokculuk:
+  # Kur/fiyat artisi beklentisine tepki katsayisi. 0 = hic stoklamaz.
+  log_ort: -0.35
+  log_sigma: 0.70
+  ust_sinir: 4.0
+
+latent_miad_toleransi:
+  # Eczacinin kabul edecegi minimum kalan raf omru (gun). Kategori carpani ile olceklenir.
+  taban_gun_ort: 150.0
+  taban_gun_sigma: 55.0
+  min_gun: 45.0
+  max_gun: 420.0
+
+latent_siparis_davranisi:
+  kapsama_hafta_ort: 2.2                # order-up-to hedefi (hafta)
+  kapsama_hafta_sigma: 0.75
+  kapsama_hafta_min: 0.8
+  gozden_gecirme_periyodu_secenekleri: [1, 2, 3, 4]
+  gozden_gecirme_periyodu_agirliklari: [0.46, 0.30, 0.15, 0.09]
+
+# Eczane ozniteliklerinin kategori egilimine etkisi.
+# log_affinite = taban + hastane_kats*yakinlik + sosyo_kats*(sosyo-0.5)*2 + turizm_kats*turizm + N(0,sigma)
+kategori_egilimi:
+  gurultu_sigma: 0.45                   # aciklanamayan eczane-kategori heterojenligi
+  tablo:
+    J01:     { taban: 0.00, hastane_kats:  0.55, sosyo_kats:  0.00, turizm_kats:  0.10 }
+    R05:     { taban: 0.00, hastane_kats:  0.25, sosyo_kats:  0.05, turizm_kats:  0.15 }
+    R06:     { taban: 0.00, hastane_kats:  0.15, sosyo_kats:  0.10, turizm_kats:  0.10 }
+    N02:     { taban: 0.00, hastane_kats:  0.30, sosyo_kats:  0.00, turizm_kats:  0.25 }
+    A02:     { taban: 0.00, hastane_kats:  0.30, sosyo_kats:  0.05, turizm_kats:  0.10 }
+    C09:     { taban: 0.00, hastane_kats:  0.75, sosyo_kats: -0.10, turizm_kats: -0.10 }
+    A10:     { taban: 0.00, hastane_kats:  0.80, sosyo_kats: -0.05, turizm_kats: -0.15 }
+    J07:     { taban: 0.00, hastane_kats:  0.60, sosyo_kats:  0.20, turizm_kats: -0.05 }
+    DERMO:   { taban: 0.00, hastane_kats: -0.35, sosyo_kats:  0.90, turizm_kats:  0.55 }
+    TEG:     { taban: 0.00, hastane_kats: -0.20, sosyo_kats:  0.70, turizm_kats:  0.35 }
+    MEDIKAL: { taban: 0.00, hastane_kats:  0.35, sosyo_kats:  0.15, turizm_kats:  0.00 }

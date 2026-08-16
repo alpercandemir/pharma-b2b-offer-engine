@@ -1,0 +1,116 @@
+# M6: off-policy degerlendirme (IPS / SNIPS / DR) + kapali dongu rollout.
+#
+# Bu dosyadaki knob'larin hicbiri DUNYAYI degistirmez (core/config.py
+# DUNYA_BOLUMLERI): hepsi "ayni loglardan hangi sayiyi cikariyorsun" ve
+# "o sayiyi neyle denetliyorsun" sorularinin kadranlari.
+#
+# Ayrimi karistirmamak icin: `uplift.kayit.*` (config/uplift.yaml) LOGLARI
+# URETEN politikadir; buradaki `ope.*` o loglari OKUYAN tahmincilerdir.
+# Kesif orani (`uplift.kayit.kesif_orani`) M6'nin en belirleyici knob'i ama
+# M4'te dogdugu icin orada duruyor -- M6 onu yalnizca supuruyor.
+
+ope:
+  # --- Degerlendirme kosusu: loglanmis veri nasil uretiliyor ---
+  kayit:
+    # Ayni olcum origin'lerinde kac BAGIMSIZ kayit kosusu yapilacak.
+    # 1'de tahmincinin varyansi olculemez, yalnizca bir cekilisi gorulur;
+    # M6'nin sapma ayristirmasinda "varyans" kalemi tam olarak bu tekrarlarin
+    # sapmasidir. Maliyeti dogrusal (her tekrar bir tepki ornekleme kosusu).
+    tekrar_sayisi: 8
+    seed: 60230812
+
+  # --- Tahminciler ---
+  tahminci:
+    # Onem agirliginin (w = 1/pi) ust siniri. Kirpma VARYANSI dusurur ve
+    # YANLILIK ekler; M6'nin merkezindeki takas budur. Sonsuz yapmak IPS'i
+    # yansiz ama pratikte kullanilamaz kilar (tek satir tahmini tasiyabilir).
+    kirpma_esigi: 20.0
+    # DR'nin artik (residual) teriminde kullanilan ayri kirpma. Ayri
+    # tutuluyor cunku DR'nin agirligi yalnizca ARTIGI olcekler; ayni esik
+    # ikisinde farkli anlam tasir.
+    dr_kirpma_esigi: 20.0
+    # Kirpmasiz (ham) IPS de her zaman hesaplanir: kirpmanin bedeli ancak
+    # ikisi yan yana konunca gorulur. Bu bir kadran degil, olcum zorunlulugu.
+
+  # --- Propensity: loglanan mi, tahmin edilen mi ---
+  propensity:
+    # `loglanan` : D7'nin vaadi -- pi(a|x) gosterim aninda yazildi.
+    # `tahmin`   : gercek hayatta sik gorulen durum -- log kayipmis ya da
+    #              guvenilmiyor, propensity veriden yeniden kestiriliyor.
+    # Ikisi arasindaki fark M6'nin "propensity kalibrasyonu" kalemidir.
+    kaynak: loglanan
+    # Loglanan propensity'ye logit uzayinda uygulanan sicaklik. 1.0 = dokunma.
+    # >1 propensity'yi duzlestirir (asiri guvensiz log), <1 keskinlestirir.
+    # KONTROLLU BOZMA: kalibrasyon hatasinin YONUNU ve buyuklugunu bilerek
+    # ayarlayip IPS'in ne yonde kaydigini gosterir.
+    sicaklik: 1.0
+    # Kestirilen ya da bozulmus propensity'nin alt siniri. Sifira yaklasan
+    # payda tek basina tahmini patlatir; bu bir sayisal taban.
+    kirpma_alt: 0.005
+    # Kestirim modeli (kaynak = tahmin oldugunda). Kayit politikasi bir
+    # softmax; agac modeli onu tam ogrenemez ve kalan hata olculebilir hale
+    # gelir -- amac da bu.
+    model:
+      ogrenme_orani: 0.08
+      azami_agac: 150
+      azami_yaprak: 31
+      min_yaprak_ornegi: 40
+      l2_duzenlilestirme: 1.0
+      seed: 60230812
+    # Kalibrasyon egrisinin kova sayisi (ECE olcumunde).
+    kalibrasyon_kova_sayisi: 10
+
+  # --- Ortusme (overlap) ve destek teshisi ---
+  ortusme:
+    # Hedef politikanin sectigi kolun loglanan olasiligi bu esigin altindaysa
+    # o satir "ortusme ihlali" sayilir. Esik kirpma_esigi ile birlikte
+    # hareket eder: 1/esik, o satirin tasiyabilecegi azami agirliktir.
+    esik: 0.02
+    # Bir kolun "destekli" sayilmasi icin gereken asgari loglanmis ornek.
+    # Altinda kalan kollarda DR'nin sonuc modeli EKSTRAPOLE eder: o kolu hic
+    # gormemistir, tahmini komsu kollardan uydurur.
+    dusuk_destek_orneklemi: 200
+
+  # --- Kapali dongu rollout (sim/rollout.py) ---
+  rollout:
+    # Dunyanin hangi haftasinda dallanilacagi. Taban dunya bu haftaya kadar
+    # BIRE BIR yeniden kosulur (ayni tohum, ayni cekilis), sonra teklifler
+    # devreye girer.
+    #
+    # NEDEN 52. Uc kisit birbirini sikistiriyor ve bu deger takasin sonucu:
+    #   (a) SPEC 5, 52 haftalik bir ufuk istiyor ve dunya 104 hafta.
+    #   (b) CATE ogreticisinin egitim penceresi (M4, models/uplift.py
+    #       `egitim_originleri`) 38..87 haftalari; sizintisiz dallanma ancak
+    #       88'den sonra olurdu ve geriye 16 hafta kalirdi.
+    #   (c) M4'un egitim penceresini kaydirmak M4'un yayinlanmis sayilarini
+    #       gecersiz kilardi (CLAUDE.md 1: onceki milestone'a dokunma).
+    # Secim: 52'de dallan, 36 haftalik egitim ORTUSMESINI kabul et ve ONU
+    # OLC. `m6.rollout.egitim_ortusmesi_hafta` her kosuda raporlanir; ayrica
+    # sizintisiz kontrol kosusu (baslangic 88, ufuk 16) raporda yan yana
+    # duruyor. Ortusmenin zararsiz oldugu iddia edilmiyor, OLCULUYOR.
+    baslangic_hafta: 52
+    # Politikanin dunyayla etkilesip sonucunun olculdugu hafta sayisi.
+    # M6'NIN ANA KADRANI. Offline tahminciler TEK ADIMLIK bir odul olcer;
+    # burasi o kararin kac hafta sonrasina kadar takip edildigini belirler.
+    ufuk_hafta: 52
+    # Birikimli degerin raporlandigi kesim noktalari. Tek bir rollout butun
+    # onekleri verir; ayri kosu gerekmez.
+    raporlanan_ufuklar: [4, 13, 26, 52]
+    # Teklifin kac hafta boyunca VERILDIGI. Ufuktan kucukse politika bir
+    # sure teklif verir, sonra dunya kendi basina kosar ve gecikmeli bedel
+    # (fazla stok, iade, SOW kaybi) gorunur hale gelir.
+    teklif_penceresi_hafta: 52
+    # Kac haftada bir yeni karar alinacak. 1 = her hafta yeniden planla.
+    # Buyutmek maliyeti dusurur ama politikayi bayatlatir.
+    karar_araligi_hafta: 1
+    # Rollout haftalarinin ortak rassal sayi (CRN) tohumu: her hafta ayni
+    # tohumdan uretilir, boylece politikalar AYNI dunyayi gorur ve aralarindaki
+    # fark politika farkidir, cekilis farki degil.
+    seed: 60230813
+    # Kosulacak politikalar. Her biri bir tam rollout demek; liste uzadikca
+    # sure dogrusal artar.
+    politikalar: [teklif_yok, propensity, uplift_x, agresif, agresif_vade, lp]
+
+  degerlendirme:
+    bootstrap_orneklem: 300
+    bootstrap_seed: 60230814

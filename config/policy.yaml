@@ -1,0 +1,245 @@
+# M3 politika katmani: aday uretimi + hard veto. SPEC M3 + D6.
+#
+# IKI AYRI SORUMLULUK, BILEREK AYRI BLOK:
+#
+#   aday:  "kime neyi teklif etmeyi DUSUNELIM" - geri getirme (retrieval).
+#          Kisitlardan HABERSIZ calisir. Bilerek: kisit katmani ancak
+#          kendisinden habersiz uretilmis bir havuzun uzerinde veto yetkisi
+#          gosterebilir (D6). Aday uretimi kisiti onceden bilseydi vetonun
+#          bedeli olculemezdi.
+#
+#   kisit: "bunlardan hangisi FIILEN teklif edilebilir" - hard veto.
+#          ML skoru ne olursa olsun bagladigi satiri listeden cikarir.
+#          Bu blok soft penalty DEGILDIR; agirliklandirilmaz, skora eklenmez.
+#
+# Bu dosyadaki hicbir knob dunyayi degistirmez (core/config.py
+# DUNYA_BOLUMLERI); politika taramalari ayni dunya uzerinde satir bazinda
+# eslesir.
+
+aday:
+  # Gecmise bakma penceresi (hafta). CF benzerligi, sepet kurallari ve akis
+  # hizi bu pencere icinden hesaplanir. Uzun pencere seyrek hucrede ayakta
+  # kalir, kisa pencere cesit degisimine hizli uyar.
+  pencere_hafta: 52
+  # Geri getirmede yakin gecmisin agirligi: agirlik = 0.5 ** (gecen / bu).
+  # Cesit (assortment) haftalik churn ile degisiyor; yariomur bu kaymayi ne
+  # kadar takip ettigimizi belirler.
+  yariomur_hafta: 26
+  # Eczane basina aday havuzu boyutu. Teslim edilen havuz budur; olcum
+  # `degerlendirme.k_degerleri` icin ayrica genis havuz kurar.
+  havuz_boyutu_k: 20
+
+  benzerlik:
+    # Item-item CF: iki SKU'nun benzer sayilmasi icin gereken en az ortak
+    # eczane sayisi. Altinda kalan cift benzerlik matrisinde sifirlanir -
+    # tek bir tesadufi ortak alim "benzerlik" uretmesin.
+    min_ortak_eczane: 3
+    # Destek kirpmasi (shrinkage): benzerlik *= n_ortak / (n_ortak + bu).
+    # Az destekli yuksek kosinus degerlerini asagi ceker.
+    kirpma: 25.0
+    # Her SKU icin tutulan en yakin komsu sayisi. Matrisin geri kalani
+    # sifirlanir; gurultulu uzun kuyrugu skorlama disinda birakir.
+    komsu_sku_sayisi: 25
+
+  sepet:
+    # "Ayni sepet" tanimi: bu kadar haftalik blokta birlikte siparis edilen
+    # SKU'lar bir sepet sayilir. Eczane haftalik degil periyodik siparis
+    # veriyor (gozden gecirme periyodu 1-4 hafta), tek hafta sepeti bolerdi.
+    pencere_hafta: 4
+    # Bir kuralin (a -> b) sayilmasi icin gereken en az birlikte gorulme.
+    min_destek: 5
+    # Minimum lift. 1.0 = bagimsizlik; altindaki kural bilgi tasimaz.
+    min_lift: 1.20
+
+  soguk_start:
+    # Gecmisi olmayan (eczane, SKU) icin oznitelik tabanli komsuluk:
+    # benzer eczanelerin aldigi urun. SPEC M3 "cold start icin eczane
+    # attribute'lari".
+    komsu_eczane_sayisi: 10
+    # "Soguk eczane" tanimi: siparis satiri sayisina gore en alttaki bu
+    # dilim. Mutlak esik degil DILIM, cunku esik profile bagli: `full`da en
+    # az gecmisi olan eczanenin bile 13 siparis satiri var, mutlak esik hic
+    # baglamiyor ve metrik NaN cikiyordu. Dilim her profilde baglar ve
+    # profiller arasi karsilastirilabilir. Bu knob HICBIR adayi degistirmez,
+    # yalnizca metrigi ikiye boler.
+    soguk_dilim: 0.20
+    # Eczane benzerliginde oznitelik agirliklari. Oznitelikler
+    # standartlastirilir, agirlikli oklid mesafesi alinir. `il` kategorik:
+    # esitse 0, degilse bu agirlik kadar mesafe eklenir.
+    oznitelik_agirliklari:
+      il: 1.00
+      hastane_yakinligi: 1.50      # SPEC 2.2 "recete miksini belirleyen en guclu feature"
+      sosyoekonomik: 1.00
+      turizm: 1.00
+      olcek: 1.00
+      sgk_recete_orani: 0.50
+      nobet: 0.25
+
+  # Hibrit karisim: her uretici eczane ici yuzdelik siraya cevrilir ve bu
+  # agirliklarla toplanir. Skor olcekleri karsilastirilamaz oldugu icin
+  # ham skor degil SIRA birlestirilir.
+  #
+  # `tekrar` agirligi bir CEPHE (frontier) uzerinde secilir, optimum degil
+  # (reports/m3.md 6.1): agirlik buyudukce toplam recall artar, yeni hucre
+  # recall'u duser. M3'un bir amac fonksiyonu YOK (marj M4'te doguyor), bu
+  # yuzden "en iyi" nokta M3'te tanimsiz. Secim kurali gozlemlenebilir bir
+  # esitlemeye dayaniyor: HAVUZUN yeni hucre payi, HEDEFIN yeni hucre payina
+  # esit olsun. Olcum (full, origin 99): hedefte yeni hucre payi 0.168;
+  # havuzdaki pay 0 -> 0.62, 0.25 -> 0.34, 0.5 -> 0.19, 1.0 -> 0.09.
+  # 0.5 esitlemeye en yakin nokta. Bedeli: toplam recall 0.450 -> 0.418,
+  # kazanci: yeni hucre recall 0.013 -> 0.040 (3 kat).
+  karisim_agirliklari:
+    tekrar: 0.50
+    cf: 0.80
+    sepet: 0.60
+    soguk_start: 0.40
+    populerlik: 0.20
+
+  # Miad baskisi: depoda kisa miatli lotu olan SKU havuzda one cekilir.
+  # skor *= (1 + bu * baski). SPEC 2.5'in temizlik guduzu BURADA baslar ve
+  # KISIT KATMANINDA BITER: baski vetoyu asamaz (tests/test_constraints.py).
+  miad_baskisi_agirligi: 0.30
+  # Depodaki bir lot bu kadar gunden az kalmissa "baski altinda" sayilir.
+  # Baski = baski altindaki adet / toplam eldeki adet.
+  miad_baskisi_esik_gun: 180
+
+  # Teklif adedi = tahmini haftalik hiz * hiz_telafi_katsayisi * bu.
+  teklif_kapsama_hafta: 4.0
+  # Gozlenen pay telafisi. M2 olcumu (reports/m2.md 3.2): bize gelen akis,
+  # eczanenin gercek tuketiminin share_of_wallet kadarlik parcasi (medyan
+  # oran 0.385). Ham akisi teklif adedine cevirmek adedi SISTEMATIK OLARAK
+  # eksik hesaplar. 1.0 = telafi yok (bilinerek yanli); ~2.5 olculen orana
+  # karsilik gelir. Telafi arttikca teklif tutari buyur ve kredi limiti
+  # vetosu baglar - iki katmani birbirine baglayan knob budur.
+  hiz_telafi_katsayisi: 1.0
+
+  degerlendirme:
+    # Recall olcum ufku (hafta): origin'den sonraki bu kadar haftada gelen
+    # siparisler hedef kumesidir. Ayni zamanda origin adimidir - pencereler
+    # ortusmesin diye.
+    ufuk_hafta: 4
+    # Kac origin uzerinde olculur. Origin'ler kosunun sonundan geriye,
+    # ufuk kadar araliklarla secilir.
+    origin_sayisi: 3
+    # recall@K egrisinin olculdugu K degerleri.
+    k_degerleri: [5, 10, 20, 50]
+
+kisit:
+  # --- REGULASYON (D6: hard veto, soft penalty degil) ---
+  # Kirmizi (narkotik) ve yesil (psikotrop) recete: promosyon/kampanya yasak,
+  # kontrollu dagitim. SPEC 2.1. Bu liste politikanin KENDI regulasyon
+  # tablosudur; urun master'indaki `promosyon_serbest` bayragi ikinci ve
+  # bagimsiz kilittir (policy/constraints.py ikisini de uygular).
+  recete_rengi_vetosu: [KIRMIZI, YESIL]
+  # TITCK tedarik guclugu listesindeki urun: kampanya degil TAHSIS problemi
+  # (SPEC 2.1). Kit urunu teklifle daha da hizli tuketmek zarar.
+  tedarik_guclugu_veto: true
+  # SGK geri odeme kapsamindaki urunde iskonto serbestisi kisitli: MF kanali
+  # kapali, vade acik (SPEC 2.5). Bu bir VETO DEGIL, aksiyon uzayi
+  # daraltmasidir; teklif listede kalir, `mf_izinli=false` ile isaretlenir.
+  sgk_kapsaminda_mf_serbest: false
+
+  # --- MIAD / LOT ---
+  # Eczaneye teklif edilen lotun en az bu kadar kalan raf omru olmali.
+  # Kisa miatli mali eczaneye yikmak zarari TRANSFER eder: satamaz, iade
+  # eder, iliski zarar gorur (SPEC 2.5, M1'de olculdu).
+  asgari_kalan_raf_omru_gun: 120
+  # Soguk zincirde tolerans penceresi dar (SPEC 2.5): esik bu katsayiyla
+  # carpilir.
+  soguk_zincir_raf_omru_carpani: 1.5
+
+  # --- LOJISTIK ---
+  # Soguk zincir minimum siparis adedi. Kargo penceresi ve tasima maliyeti
+  # nedeniyle bunun altinda sevkiyat yapilmaz. Simulatordeki karsiligi
+  # `sim.envanter.soguk_zincir_minimum_siparis_adedi`; ikisi AYRI knob,
+  # cunku politikanin kurali bilmesi ile dunyanin kurali uygulamasi ayri
+  # seylerdir (TUNING.md M3-A4).
+  soguk_zincir_min_siparis_adedi: 5
+  # Teklif adedi minimumun altinda kalinca ne yapilir:
+  #   yukselt : adet minimuma cikarilir, sonra emilim tavani yeniden bakilir
+  #   veto    : satir listeden cikar
+  soguk_zincir_min_altinda: yukselt
+  # Emilim tavani: teklif adedi eczanenin bu kadar haftalik ihtiyacini
+  # asamaz. Asarsa teklif "satamayacagi mali yikmak" olur.
+  azami_kapsama_hafta: 12.0
+  # Depoda teklif adedinin bu kati kadar mal olmali. Tek teklifin
+  # fizibilitesi; KIT stok altinda eczaneler arasi paylastirma M5'e ait.
+  depo_stok_yeterlilik_carpani: 1.0
+
+  # --- KREDI (DBS) ---
+  # Acik bakiye tahmini: son bu kadar haftada sevk ettigimiz tutar henuz
+  # tahsil edilmemis sayilir. Gozlemlenebilir veriden (sevkiyat x DSF)
+  # kurulur; gercek cari hesap tablosu bu POC'ta yok.
+  acik_bakiye_vade_hafta: 8
+  # DBS limitinin bu kadarina kadar risk alinir.
+  kredi_kullanim_tavani: 0.85
+  # Vade riski cezasi: etkin tavan = kullanim_tavani * (1 - vade_riski * bu).
+  # Riskli eczanede limit daralir.
+  vade_riski_cezasi: 0.40
+
+  # --- FREKANS ---
+  # Eczane basina haftalik azami teklif satiri. SPEC 5 "frekans tavani".
+  # Veto'dan SONRA, skora gore en iyi bu kadari kalir.
+  eczane_haftalik_teklif_tavani: 5
+
+# ==========================================================================
+# M4: AKSIYON UZAYI (D1) ve SKORLAMA
+# ==========================================================================
+# D1 tartismaya kapali: aksiyon YUZDE ISKONTO DEGIL, (mal_fazlasi_orani,
+# vade_gunu) ciftidir. Bu blokta yuzde iskonto knob'u yok ve olmayacak.
+aksiyon:
+  # MF oranlari. 0.10 = "10+1", 0.05 = "20+1", 0.02 = "50+1".
+  # Ust sinir depo marj kademesiyle sinirli: `urun.marj_kademeleri` %3-%9
+  # arasinda; tedarikci destegi olmadan %10 MF butun marji yer (bkz. skor).
+  mf_oranlari: [0.0, 0.02, 0.05, 0.10]
+  # Vade secenekleri (gun). Hepsi taban vadeye ESIT YA DA DAHA UZUN: bir
+  # kampanya eczaneye standart sarttan KOTU bir vade teklif etmez.
+  #
+  # 30 gun (taban vadenin altini) bilerek YOK. Denendi ve olculdu
+  # (reports/m4.md 7.1): net isletme sermayesi = musteri vadesi - tedarikci
+  # vadesi oldugu icin vadeyi kisaltmak ciroya oranla ~%2.5 marj kazandiriyor
+  # ve depo marji zaten %3-9. Sonuc: butun politikalar herkese "vade 30"
+  # veriyor, kazanc terimi hem seviyeye hem artima ortak giriyor ve
+  # propensity ile uplift politikalari AYNILASIYOR (marj farki -%4). Bu bir
+  # heterojenlik eksikligi degil, ortak bir terimin amac fonksiyonunu domine
+  # etmesi. Vade 30 bir kampanya aksiyonu degil, bir yeniden pazarliktir.
+  vade_gunleri: [60, 90, 120]
+  # Teklif VERILMEDIGINDE organik siparisin tabi oldugu vade. Karsi-olgusal
+  # marj bu vadeyle hesaplanir; aksiyonlar buna gore artimsaldir.
+  taban_vade_gun: 60
+  # MF teklifinde adet koli katina yuvarlanir (SPEC 2.1: "MF oranlari koli
+  # katlarina yuvarlanir"). 7 adetlik bir satirda "10+1" anlamsizdir.
+  # Yuvarlama adedi BUYUTUR; buyuyen adet emilim tavanini asarsa o satirda
+  # MF kanali kapanir (veto degil, kanal kisiti - policy/scorer.py).
+  koli_katina_yuvarla: true
+
+skor:
+  # --- MF maliyeti ---
+  # Bedava verilen adedin birim maliyeti bize kalir; ancak tedarikci de
+  # kendi MF'ini veriyorsa maliyetin bir kismi ustlenilmis olur.
+  # SPEC 8 DOGRULAMA LISTESI: uretici -> depo MF destegi oranlari teyit
+  # edilmeli. POC'ta parametrik; 0.0 = destek yok (butun maliyet bizde).
+  tedarikci_mf_destek_orani: 0.50
+
+  # --- Vade maliyeti ---
+  # TRY fonlama orani (yillik). Yuksek enflasyon rejiminde vade birinci
+  # derece marj kaldiracidir - depo marji %3-9 iken 30 gunluk vade farki
+  # ciroya oranla %2.5 ediyor. SPEC 5 "vade maliyeti (TRY fonlama orani)".
+  yillik_fonlama_orani: 0.30
+  # Tedarikciden aldigimiz vade (gun). Net isletme sermayesi = musteri
+  # vadesi - tedarikci vadesi. Musteri vadesi bunun ALTINDAysa fonlama
+  # kalemi POZITIF katkidir (tedarikci bizi finanse ediyor).
+  # SPEC 8 DOGRULAMA LISTESI: depo-uretici odeme kosullari teyit edilmeli.
+  tedarikci_vade_gun: 90
+  # Beklenen kredi zarari = tutar * vade_riski_skoru * bu * (vade / 365).
+  # Vadeye en cok deger veren eczane ayni zamanda en riskli olandir; bu
+  # katsayi o gerilimi marja tasir. 0 yapilirsa `vade_riski_skoru` yalnizca
+  # kisit katmaninda kalir, skorlamada olu kolon olur.
+  temerrut_ceza_katsayisi: 0.08
+
+  # --- Aksiyon secimi ---
+  # Bir satira teklif cikmasi icin gereken asgari BEKLENEN ARTIMSAL marj (TL).
+  # Uplift tabanli politikanin "teklif verme" karari bu esikten geciyor;
+  # propensity tabanli politika bu esigi SEVIYE marja uyguladigi icin
+  # neredeyse hicbir satiri elemiyor - fark M4'un olctugu seyin ta kendisi.
+  asgari_teklif_marji: 0.0

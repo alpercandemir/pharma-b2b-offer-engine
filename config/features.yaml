@@ -1,0 +1,82 @@
+# M2 feature katmani. SPEC 3 "features/ - leakage guard'li, point-in-time dogru".
+#
+# Buradaki her hesap YALNIZCA data/<kosu>/observable/ altindan beslenir.
+# Gercek tuketim, gercek eczane stogu ve share_of_wallet ground_truth/ altinda
+# durur ve feature builder onlara erisemez (features/okuma.py fiziken engeller).
+#
+# Kritik olcum (reports/m2.md 3.1): bize gelen siparis akisi, eczanenin gercek
+# tuketiminin share_of_wallet ile olceklenmis halidir. Yani hiz tahminleri
+# SISTEMATIK OLARAK KUCUKTUR ve carpan latent'tir. Asagidaki knob'larin cogu
+# bu korlukle nasil bas edilecegini ayarlar.
+
+panel:
+  # Bir origin'in (tahmin ani) gecmisi bu kadar hafta olmali. Altinda hiz
+  # tahmini gurultuden ibaret.
+  ilk_origin_hafta: 26
+  # Origin adimi. 1 = her hafta (en cok satir, en cok ortusme), 4 = seyrek.
+  # Ufuktan kucuk adim, ayni hucrenin ust uste binen pencerelerini uretir:
+  # satir sayisi artar ama bagimsiz bilgi artmaz.
+  origin_araligi_hafta: 2
+  # Hucrenin panele girmesi icin son bu kadar hafta icinde bize en az
+  # `min_siparis_sayisi` siparis vermis olmasi gerekir. Aday evreninin tanimi:
+  # hic gormedigimiz hucre icin hiz tahmini yoktur.
+  aday_pencere_hafta: 52
+  min_siparis_sayisi: 1
+  # Zaman bazli bolme: origin haftalarinin ilk bu orani egitim, kalani test.
+  # Rassal bolme YAPILMAZ - ayni hucrenin gelecegi egitime sizardi.
+  egitim_orani: 0.65
+
+hiz:
+  # Tuketim hizi tahmininde kullanilan gerileme pencereleri (hafta).
+  # Kisa pencere mevsimsel donuse hizli uyar, uzun pencere seyrek hucrede
+  # ayakta kalir. Ikisi de feature olarak verilir, agirligi model kurar.
+  pencereler_hafta: [4, 13, 26, 52]
+  # Haftalik sevk adedinin EWMA'si. Pencere ortalamasinin surekli muadili.
+  ewma_alfa: 0.20
+  # Havuzlama (shrinkage) gucu: hucre hizi, eczane x kategori ortalamasina
+  # dogru n/(n+bu) agirligiyla cekilir. Uzun kuyrukta hucre basina 1-2 siparis
+  # var; havuzlama olmadan hiz tahmini tek bir siparise baglanir.
+  havuzlama_gucu: 3.0
+  # Siparis MIKTARINDAN hiz cikarimi (SPEC M2 "siparis miktarindan tuketim
+  # hizi cikarimi"): eczane order-up-to calisir, tek siparis yaklasik bu kadar
+  # haftalik ihtiyaci kapatir. hiz_miktar = ortalama_siparis_adedi / bu.
+  # AKIS tahmininden farki: siparisin TAMAMI tek tedarikciye gider, yani
+  # miktar share_of_wallet ile olceklenmez. Ikisinin orani gozlenen payin
+  # tahminidir.
+  varsayilan_dongu_hafta: 4.0
+  # Sifira bolme korumasi (adet/hafta). Bu tabanin altindaki hiz tahmini
+  # "olcemedik" demektir; tukenme suresi tavana dayanir.
+  min_hiz: 0.02
+  # Tahmini gozlenen payin alt siniri. Cok kucuk tahminler hiz duzeltmesini
+  # patlatir.
+  gozlenen_pay_tabani: 0.10
+
+stok:
+  # Defter (ledger) yaklasimi: eldeki stok = kumulatif sevkiyat - kumulatif
+  # tahmini tuketim, sifirda taban.
+  #
+  # Defter stok tahmininin ust siniri (hafta cinsi kapsama).
+  #
+  # ILK GEREKCE YANLIS CIKTI, olculdugu icin degistirildi (reports/m2.md 3.4):
+  # "eczanenin order-up-to tavani var, defter de onu asmamali" diye 8 idi.
+  # Ama defter SEYRELTILMIS akisla besleniyor: eczanenin gercek 6 haftalik
+  # tavani bizim birimimizde ~6 x gozlenen_pay ~ 2.4 haftaya denk geliyor ve
+  # tam o civar EN KOTU ayar. Tavan, stok tahmininin ust ucundaki siralama
+  # bilgisini beraberlige ceviriyor.
+  # Olcum (fast, 5 seed / full, eslesmis bootstrap): defter AUC 2 -> 0.506,
+  # 8 -> 0.520, 30 -> 0.549, 100 ve 300 -> 0.549 (doyuyor). full'de 8 -> 30
+  # farki +0.015 AUC [%95: +0.008, +0.022].
+  # 30, etkinin doydugu nokta: pratikte "tavan yok" demek.
+  tavan_kapsama_hafta: 30.0
+  # Gecmisin basinda eczanede varsayilan stok (hafta cinsi kapsama).
+  baslangic_kapsama_hafta: 0.0
+  # Gozlenen payi telafi katsayisi: sevkiyat akisi buna BOLUNEREK "gercek"
+  # akisa cevrilir. 1.0 = telafi yok.
+  #
+  # DIKKAT (reports/m2.md 3.2): defterde tukenme suresi = stok/hiz ve iki
+  # taraf da ayni katsayiyla telafi edildigi icin katsayi SADELESIR:
+  # `defter_tukenme_hafta` bu knob'a duyarsizdir (min_hiz kirpmasi disinda).
+  # Buna karsilik `son_siparis_tukenme_hafta` duyarlidir: siparis MIKTARI
+  # seyreltilmez, hiz seyreltilir; o tahminci ancak bu katsayi gercek gozlenen
+  # paya yaklastikca duzelir. Knob'in ogrettigi sey bu ayrim.
+  varsayilan_gozlenen_pay: 1.0

@@ -1,0 +1,127 @@
+# M7 eval senaryolari. SPEC 3: "harness/cases.yaml Eval senaryolari".
+#
+# IKI TUR VAKA VAR ve ikisi de zorunlu:
+#
+#   temiz  : dogru uretilmis brifing. Beklenen bulgu SIFIR. Denetcinin
+#            yanlis alarm uretmedigini gosterir.
+#   mutant : ayni brifingin BOZULMUS hali (harness/mutasyon.py). Beklenen
+#            bulgu tipi yazili ve o tip CIKMAK ZORUNDA. Denetcinin fiilen
+#            yakaladigini gosterir.
+#
+# Yalnizca temiz vakalar kosulsaydi harness hicbir sey kanitlamazdi: her
+# seyi geciren bir denetci de o vakalari gecirirdi. Yalnizca mutantlar
+# kosulsaydi yanlis alarm gorunmezdi. Ikisi birlikte olcu olur.
+#
+# `eczane: otomatik` -> mutasyonun uygulanabildigi ILK eczane secilir
+# (kimlige gore sirali, dolayisiyla tekrar uretilebilir). Elle eczane
+# yazmak da mumkun ama config degisince vaka bayatlar.
+#
+# `beklenen` ASGARI sayidir ("en az bu kadar bulgu, bu tipte"). Ust sinir
+# konmadi cunku bir bozma birden fazla belirti uretebilir; kritik olan
+# beklenen tipin CIKMASI.
+
+vakalar:
+  # --- temiz: yanlis alarm yok ---
+  - ad: temiz_sablon
+    tip: temiz
+    kaynak: sablon
+    eczane: otomatik
+    aciklama: >
+      Olgu paketinden deterministik uretilmis brifing. Sifir bulgu vermeli;
+      vermiyorsa hata denetcide ya da sablonda, ikisi de duzeltilmeli.
+
+  - ad: temiz_kayitli_konusma
+    tip: temiz
+    kaynak: kayitli
+    kayit: "sablon_konusma_{profil}.json"
+    eczane: otomatik
+    aciklama: >
+      Kayitli konusmanin oynatilmasi: arac dongusu, arac sonuclarinin
+      YENIDEN hesaplanmasi ve sayi defterinin araclardan kurulmasi bu
+      vakada calisir. Kaydin metni sablon ureticiden geldigi icin bu bir
+      MODEL testi degil, KAYIT YOLU testidir; ayrimi rapor da boyle yaziyor.
+
+  # --- mutant: dort cikis kriteri belirtisi + iki ek ---
+  - ad: mutant_sayi_bozma
+    tip: mutant
+    kaynak: sablon
+    mutasyon: sayi_bozma
+    eczane: otomatik
+    beklenen: {sayi_uydurma: 1}
+    aciklama: "Rapordaki rakam gercek ciktiyla uyusmuyor."
+
+  - ad: mutant_senaryo_takasi
+    tip: mutant
+    kaynak: sablon
+    mutasyon: senaryo_takasi
+    eczane: otomatik
+    beklenen: {senaryo_karismasi: 1}
+    aciklama: >
+      Baz senaryonun sayisi sok senaryosuna yazildi. Butun sayilar gercek,
+      yalnizca rejim yanlis -- bagil toleransin goremeyecegi tek hata tipi.
+
+  - ad: mutant_veto_onerisi
+    tip: mutant
+    kaynak: sablon
+    mutasyon: veto_onerisi
+    eczane: otomatik
+    beklenen: {kisit_ihlali: 1}
+    aciklama: "Kirmizi/yesil receteli urun onerildi (D6 ihlali)."
+
+  - ad: mutant_mf_kanali
+    tip: mutant
+    kaynak: sablon
+    mutasyon: mf_kanali_ihlali
+    eczane: otomatik
+    beklenen: {kisit_ihlali: 1}
+    aciklama: "SGK kapsaminda MF kanali kapaliyken mal fazlasi onerildi."
+
+  - ad: mutant_lot_karistirma
+    tip: mutant
+    kaynak: sablon
+    mutasyon: lot_karistirma
+    eczane: otomatik
+    beklenen: {kisit_ihlali: 1}
+    aciklama: "Tahsis edilmemis (ama var olan) lot referansi verildi."
+
+  - ad: mutant_hayali_eczane
+    tip: mutant
+    kaynak: sablon
+    mutasyon: hayali_eczane
+    eczane: otomatik
+    beklenen: {hallusinasyon: 1}
+
+  - ad: mutant_hayali_sku
+    tip: mutant
+    kaynak: sablon
+    mutasyon: hayali_sku
+    eczane: otomatik
+    beklenen: {hallusinasyon: 1}
+
+  - ad: mutant_hayali_lot
+    tip: mutant
+    kaynak: sablon
+    mutasyon: hayali_lot
+    eczane: otomatik
+    beklenen: {hallusinasyon: 1}
+
+  - ad: mutant_uydurma_oneri
+    tip: mutant
+    kaynak: sablon
+    mutasyon: uydurma_oneri
+    eczane: otomatik
+    beklenen: {uydurma_oneri: 1}
+    aciklama: >
+      Kimlikleri gercek, kisiti delmeyen, ama politikanin hic uretmedigi
+      bir oneri. Dort cikis kriterinin disinda kalan bosluk; olcusuz
+      birakilmadi.
+
+  - ad: mutant_bolum_silme
+    tip: mutant
+    kaynak: sablon
+    mutasyon: bolum_silme
+    eczane: otomatik
+    beklenen: {bicim_ihlali: 1}
+    aciklama: >
+      Bir rejim bolumu silindi. D3 tek rejimi one cikarmayi yasakliyor;
+      eksik bolum bicim ihlalidir.

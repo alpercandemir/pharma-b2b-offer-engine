@@ -1,0 +1,65 @@
+[project]
+name = "pharma-b2b-offer-engine"
+version = "0.1.0"
+description = "B2B ilac pazaryeri teklif/kampanya karar motoru - ogrenme substrati"
+requires-python = ">=3.11"
+
+# Bagimliliklar milestone bazinda eklenir.
+#   M1: numpy, polars, pyarrow, pydantic, pyyaml, matplotlib
+#   M2: scikit-learn (HistGradientBoosting = histogram tabanli GBDT + metrikler)
+#   M3: YENI BAGIMLILIK YOK. Aday uretimi (item-item CF, market basket, oznitelik
+#       komsulugu) yogun matris carpimlari; SKU x SKU 300x300, eczane x eczane
+#       200x200 -- numpy yetiyor, seyrek matris kutuphanesi gereksiz. implicit /
+#       lightfm gibi paketler bu olcekte kurulum maliyeti disinda bir sey
+#       getirmezdi ve algoritmayi gorunmez kilardi (bu repo bir ogrenme substrati).
+#
+# LightGBM DENENDI ve geri alindi: macOS'ta calismasi icin sistem duzeyinde
+# `brew install libomp` gerekiyor, yoksa import aninda dlopen hatasi veriyor.
+# sklearn'un HistGradientBoosting'i ayni algoritma ailesi (histogram binning,
+# yaprak bazli buyume, kategorik ozellik destegi) ve ek sistem bagimliligi yok.
+# Gerekce reports/m2.md 6'da.
+# lifelines -> gerekirse ilgili milestone'da eklenecek.
+#
+# M7: `anthropic` ISTEGE BAGLI bir grup (`[project.optional-dependencies]`),
+# temel bagimlilik DEGIL. Sebep M7'nin determinizm cozumu: harness canli
+# API'ya degil KAYITLI konusmalara bakiyor (agent/client.py), dolayisiyla
+# `uv run pytest` ve `scripts/verify_m7` bu paket kurulu olmadan da tam
+# olarak kosuyor. Temel bagimlilik yapilsaydi ag erisimi olmayan bir
+# ortamda butun test paketi kurulum asamasinda duserdi -- LLM katmani
+# yuzunden M1-M6'nin regresyonu kaybedilirdi.
+#
+# M5: scipy ACIK bagimlilik oldu. `scipy.optimize.linprog(method="highs")`
+# tahsis LP'sini cozuyor (SPEC 6: "PuLP veya scipy.optimize"). PuLP yerine
+# scipy secildi cunku (a) scikit-learn uzerinden zaten kuruluydu, (b) HiGHS
+# DUAL cozumu dogrudan veriyor -- golge fiyat M5 raporunun merkezinde ve
+# dualleri elle cikarmak istemedim. Transitif bagimlilik olarak birakmak
+# yanlis olurdu: sklearn surumu degisip scipy dususe kosu sessizce kirilirdi.
+dependencies = [
+    "numpy>=1.26",
+    "polars>=1.0",
+    "pyarrow>=15.0",
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+    "matplotlib>=3.8",
+    "scikit-learn>=1.9.0",
+    "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+# Yalnizca `harness.run --canli` ve `ajan.istemci: anthropic` icin gerekli.
+#   uv sync --extra llm
+llm = [
+    "anthropic>=0.40",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.uv]
+package = false

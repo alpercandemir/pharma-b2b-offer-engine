@@ -1,0 +1,95 @@
+# Rejim / olay katmani. SPEC 2.4.
+#
+# ONEMLI (D4): antisipasyon PENCERESI olayin yururluk tarihinden ONCE baslar ve
+# o pencerede kamuya duyuru YOKTUR. Gozlemlenebilir katmana olay ancak
+# yururluge girdigi hafta yazilir (gorunur_hafta = yururluk_hafta). Model
+# "gecikmis mi" bilgisini gecmis olaylarin araligindan cikarmak zorunda.
+# Antisipasyon bayragini feature olarak vermek leakage'dir.
+
+referans_kur:
+  baslangic_deger: 38.0                  # TL/EUR referans kur baslangici (placeholder, SPEC 8)
+  guncelleme_artis_ort: 0.16             # her guncellemede oransal artis
+  guncelleme_artis_sigma: 0.05
+  fiyat_gecis_katsayisi: 0.85            # referans kur artisinin fiyata yansima orani
+  fiyat_gecis_gecikme_hafta: 1
+
+olaylar:
+  - tip: REFERANS_KUR_GUNCELLEME
+    kapsam: GLOBAL
+    # Yari-periyodik: model "ne kadar gecikti" sinyalini ancak buradan ogrenebilir.
+    min_ara_hafta: 16
+    max_ara_hafta: 30
+    antisipasyon_hafta_min: 2
+    antisipasyon_hafta_max: 6
+    antisipasyon_siddeti: 1.00           # 0..1; siparis tarafi stoklama yogunlugu
+    tuketim_carpani: 1.00                # tuketim DEGISMEZ - sadece siparis stoklanir
+    sure_hafta_min: 1
+    sure_hafta_max: 1
+    kalici_seviye_kaymasi: 0.00
+    kalici_kayma_yukari_olasiligi: 0.50
+    etkilenen_sku_orani: 1.00
+    ikmal_bloklar: false
+
+  - tip: SGK_LISTE_GUNCELLEME
+    kapsam: SKU
+    min_ara_hafta: 10
+    max_ara_hafta: 20
+    antisipasyon_hafta_min: 1
+    antisipasyon_hafta_max: 2
+    antisipasyon_siddeti: 0.45
+    tuketim_carpani: 1.00
+    sure_hafta_min: 1
+    sure_hafta_max: 1
+    kalici_seviye_kaymasi: 0.45          # +/- bu oranda kalici seviye kaymasi
+    kalici_kayma_yukari_olasiligi: 0.50  # listeye girme vs cikma dengesi
+    etkilenen_sku_orani: 0.05
+    ikmal_bloklar: false
+
+  - tip: TITCK_GERI_CEKME
+    kapsam: SKU
+    min_ara_hafta: 14
+    max_ara_hafta: 34
+    antisipasyon_hafta_min: 0
+    antisipasyon_hafta_max: 0
+    antisipasyon_siddeti: 0.00
+    tuketim_carpani: 0.00                # sok: talep sifirlanir
+    sure_hafta_min: 6
+    sure_hafta_max: 20
+    kalici_seviye_kaymasi: 0.00
+    kalici_kayma_yukari_olasiligi: 0.50
+    etkilenen_sku_orani: 0.012
+    ikmal_bloklar: true
+
+  - tip: TEDARIK_KRIZI
+    kapsam: SKU
+    min_ara_hafta: 8
+    max_ara_hafta: 18
+    antisipasyon_hafta_min: 0
+    antisipasyon_hafta_max: 2
+    antisipasyon_siddeti: 0.70
+    tuketim_carpani: 1.00
+    sure_hafta_min: 4
+    sure_hafta_max: 16
+    kalici_seviye_kaymasi: 0.00
+    kalici_kayma_yukari_olasiligi: 0.50
+    etkilenen_sku_orani: 0.03
+    ikmal_bloklar: true                  # bizim ikmalimiz durur -> tahsis problemi
+
+  - tip: EPIDEMI_DALGASI
+    kapsam: KATEGORI_AKUT
+    min_ara_hafta: 20
+    max_ara_hafta: 44
+    antisipasyon_hafta_min: 1
+    antisipasyon_hafta_max: 2
+    antisipasyon_siddeti: 0.50
+    tuketim_carpani: 2.80                # 2-4x bandinin ortasi
+    sure_hafta_min: 3
+    sure_hafta_max: 8
+    kalici_seviye_kaymasi: 0.00
+    kalici_kayma_yukari_olasiligi: 0.50
+    etkilenen_sku_orani: 1.00
+    ikmal_bloklar: false
+
+ikame:
+  # TITCK_GERI_CEKME sonrasi ayni etken maddedeki diger SKU'lara kayan talep.
+  geri_cekmede_ikame_orani: 0.65

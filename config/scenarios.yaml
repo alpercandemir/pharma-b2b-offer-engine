@@ -1,0 +1,89 @@
+# M7 senaryo katmani. D3: "Kur tahmin hedefi degil, SENARYO GIRDISIDIR."
+#
+# BU DOSYA BIR TAHMIN DEGILDIR. Buradaki hicbir sayi "kur boyle olacak"
+# demiyor; "kur boyle OLSAYDI politika ne onerirdi" sorusunun girdisi.
+# Cikti da hicbir zaman tek bir oneri degil, rejim basina KOSULLU bir
+# tablodur (agent/scenario.py). Tek bir rejimi secip "tavsiye" diye sunmak
+# D3'un ihlalidir; narrative katmani butun rejimleri yan yana yazmak
+# zorunda ve harness bunu deterministik olarak siniyor.
+#
+# D4 ile bagi: asil makro sinyal piyasa kuru degil, REFERANS KUR GUNCELLEME
+# BEKLENTISIDIR (SPEC 2.4). Bu yuzden rejimin birinci parametresi kurun
+# seviyesi degil, guncellemeye kalan sure.
+#
+# UC KANAL, UCU DE AYRI YONE CEKER -- katmanin varlik sebebi bu:
+#
+#   1) ERTELEME KAZANCI (fiyat gecisi). Depodaki adedin maliyeti gecmiste
+#      sabitlendi; referans kur guncellemesi DSF'i yukari tasiyinca AYNI
+#      adet daha yuksek marjla satilir. Bugun satmanin firsat maliyeti bu
+#      farktir ve teklifi ASAGI ceker. Miadi guncellemeden once dolan lotta
+#      bu kalem SIFIRDIR -- D9 ile kesisme burada ve senaryo katmaninin en
+#      ogretici sonucu bu: sok rejiminde ayakta kalan teklifler kisa miatli
+#      lotlardir.
+#   2) FONLAMA. Rejim sertlestikce TRY fonlama maliyeti artar; uzun vade
+#      kollari cezalanir. Yeni bir formul degil, `politika.skor.
+#      yillik_fonlama_orani` knob'inin senaryo altinda gecersiz kilinmasi.
+#   3) ANTISIPASYON TALEBI. Guncelleme beklentisi eczanede stoklama
+#      tetikler (SPEC 2.4: talep 3-5x). Hiz tahmini yukari kayar; teklif
+#      adedi ve emilim tavani birlikte buyur -- teklifi YUKARI ceker.
+#
+# Net sonuc kagit uzerinde belirsizdir; olculmesi gerekir. Olculdugu yer
+# `reports/m7.md` 4 ve `experiments/sweep.py --knob senaryo.ikame_ufku_hafta`.
+
+senaryo:
+  # Senaryo altinda kosulan teslim politikasi. M6'nin kapali dongusunde
+  # olculen gozlemlenebilir politikalarin adiyla birebir ayni olmali;
+  # core/config.py bunu dogruluyor. Neden knob: "hangi politikanin senaryo
+  # duyarliligini okuyoruz" bir olcum karari, kod sabiti degil.
+  politika: uplift_x
+
+  # Karsilastirmanin referans rejimi. Butun farklar buna gore yazilir ve
+  # bu rejim NOTR olmak zorunda (core/config.py `_m7_senaryo_kilidi`):
+  # notr olmayan bir taban, "fark" kelimesini anlamsiz kilardi.
+  taban_ad: baz
+
+  # Depodaki bir adedin, satilmayip beklendiginde yeniden fiyatlanmis
+  # olarak satilabilecegi ufuk (hafta). Erteleme kazanci bu ufka gore
+  # olceklenir:
+  #     beklenti_payi = kirp(1 - guncelleme_beklentisi_hafta / bu, 0, 1)
+  # Guncelleme ufkun disindaysa (baz rejimi) kalem tam olarak sifirdir --
+  # yani baz rejimde bu dosyanin marj aritmetigine hicbir katkisi yok.
+  ikame_ufku_hafta: 12.0
+
+  # NOT: "lot guncellemeyi bekleyebilir mi" esigi icin AYRI BIR KNOB YOK.
+  # Beklemek, ayni mali GUNCELLEMEDEN SONRA teklif etmek demektir ve o gun
+  # de `politika.kisit.asgari_kalan_raf_omru_gun` tabani gecerlidir:
+  #     bekleyebilir  <=>  kalan_gun - beklenti_hafta*7 >= asgari_raf_omru
+  # Yeni bir esik uydurmak yerine politikanin kendi tabani kullanildi
+  # (agent/scenario.py::erteleme_kazanci). Bu kapinin fiilen bagladigi
+  # satir orani her kosuda `m7.senaryo.<rejim>.bekleyemeyen_pay` olarak
+  # raporlanir -- baglamiyorsa kanal dekoratiftir ve oyle gorunur.
+
+  # Rejimler. `guncelleme_beklentisi_hafta` D4'un sinyali: kurun SEVIYESI
+  # degil, guncellemeye kalan sure. `referans_kur_artisi` guncellemenin
+  # buyuklugu, `fiyat_gecis_katsayisi` bunun DSF'e ne kadarinin yansidigina
+  # dair POLITIKANIN INANCI (dunyanin gercegi degil -- dunya tarafi
+  # events.yaml'da ve ikisi bilerek ayri; M5'in `normal_realizasyon_orani`
+  # ile ayni disiplin).
+  rejimler:
+    - ad: baz
+      aciklama: "Guncelleme ufkun disinda; kur bir karar girdisi degil"
+      guncelleme_beklentisi_hafta: 26.0
+      referans_kur_artisi: 0.00
+      fiyat_gecis_katsayisi: 0.00
+      antisipasyon_talep_carpani: 1.00
+      fonlama_orani_carpani: 1.00
+    - ad: yuksek
+      aciklama: "Guncelleme iki ay icinde bekleniyor, orta siddetli artis"
+      guncelleme_beklentisi_hafta: 8.0
+      referans_kur_artisi: 0.15
+      fiyat_gecis_katsayisi: 0.60
+      antisipasyon_talep_carpani: 1.35
+      fonlama_orani_carpani: 1.25
+    - ad: sok
+      aciklama: "Guncelleme iki hafta icinde; stoklama dalgasi baslamis"
+      guncelleme_beklentisi_hafta: 2.0
+      referans_kur_artisi: 0.30
+      fiyat_gecis_katsayisi: 0.85
+      antisipasyon_talep_carpani: 2.20
+      fonlama_orani_carpani: 1.60

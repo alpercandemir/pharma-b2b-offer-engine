@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# IDE / editor
+.idea/
+.vscode/
+.DS_Store
+
+# Claude Code local state
+.claude/
+
+# Agent-facing instruction files (kept locally, not published)
+CLAUDE.md
+PROMPTS.md
+
+# Generated worlds and run artifacts.
+# Every run is seeded and reproducible:
+#   uv run python -m scripts.generate_world --profil full --kosu full
+data/
+experiments/runs/
+
+# Scratch output
+_sweep_final.txt

@@ -1,0 +1,131 @@
+# M5 tahsis katmani: sonlu stok altinda LP (D5) + miad rejimi (D9, SPEC 2.5).
+#
+# D5 TARTISMAYA KAPALI: skorlama ile tahsis AYRI katmanlardir. M4 "bu satira
+# hangi aksiyon" sorusunu cozuyor; burasi "ayni lotu isteyen 200 eczane
+# arasinda kim alacak" sorusunu cozuyor. Ranking tek basina ayni kit SKU'yu
+# herkese onerir ve teklif listesi fiilen karsilanamaz.
+#
+# D9 TARTISMAYA KAPALI: miad temizligi AYRI BIR MOTOR DEGIL, bu LP'nin bir
+# rejimidir. Tek mekanizma: lotun devam degeri (`salvage`) negatife dondugunde
+# stok bilancoda varlik degil YUKUMLULUK olur ve lot kisitinin gölge fiyati
+# isaret degistirir. Ayri bir amac fonksiyonu, ayri bir kod yolu yok.
+#
+# Bu dosyadaki hicbir knob dunyayi degistirmez (core/config.py
+# DUNYA_BOLUMLERI): ayni dunya uzerinde politika taramalari satir bazinda
+# eslesir. `senaryo` blogu bile dunyayi degil, LP'ye verilen ORIGIN
+# GORUNUMUNU degistirir (D3'un "kur tahmin edilmez, senaryolastirilir"
+# disiplininin stok tarafindaki karsiligi).
+
+tahsis:
+  lp:
+    # Bir aday satiri icin LP'ye kac lot sutunu acilir (FEFO sirasinda ilk N).
+    # Lot secimi LP'nin karari: kit SKU'da hangi eczanenin hangi lottan
+    # alacagi bir tahsis problemidir, FEFO'nun tek basina cevabi degil.
+    # 1 = "lotu kisit katmani secsin, LP yalnizca kimin alacagina karar versin".
+    aday_lot_sayisi: 3
+    # HiGHS icin sure siniri (sn). Asilirsa kosu DUSER (sessizce kotu bir
+    # cozume razi olmaz): LP cozulemeyen bir kosunun metrikleri okunmamali.
+    cozucu_zaman_siniri_sn: 300
+    # LP gevsetmesinin cikardigi kesirli cozum, ayni kisitlar altinda tam
+    # sayili bir politikaya yuvarlanir (azalan indirgenmis kazanc sirasinda
+    # acgozlu gecis). false birakilirsa LP DEGERI raporlanir ama teslim
+    # edilebilir bir politika uretilmez - yalnizca butunluk acigini olcmek icin.
+    butunluk_yuvarlamasi: true
+    # DBS kredi limiti LP'nin KISITI olarak girer (D6: kisit katmani optimizasyonun
+    # icinde de veto yetkisini korur). false yapilirsa limit yalnizca secim
+    # SONRASI kontrol edilir (M4 davranisi) ve LP fizibil olmayan bir plan
+    # onerebilir - vetonun bedelini olcmek icin bilerek kapatilabilir.
+    kredi_kisiti: true
+    # Tahsis hedefi (SPEC 5): kisa vadeli marj vs share-of-wallet buyutme.
+    # Amac fonksiyonuna eklenen buyume primi:
+    #     prim = bu * beklenen_ciro * (satir yeni hucre mi)
+    # 0 = saf marj maksimizasyonu. Buyudukce kit stok yeni iliskilere kayar;
+    # bugunku marj duser, gozlenen pay (M2'nin olctugu) buyur.
+    # share_of_wallet LATENT oldugu icin prim gozlemlenebilir bir vekile
+    # (yeni hucre) baglanir - dogrudan sow'a baglanamaz.
+    sow_buyutme_agirligi: 0.0
+
+  # ==========================================================================
+  # TEMIZLIK REJIMI (D9 / SPEC 2.5)
+  # ==========================================================================
+  # Lot birim devam degeri:
+  #     kalan_gun >= tetik_gun   -> +normal_marj * normal_realizasyon_orani
+  #     0 < kalan_gun < tetik    -> deger_egrisi ile azalir, isaret degistirir
+  #     kalan_gun <= 0           -> -imha_maliyeti
+  # LP'de lotun ARTAN adedi bu degerle odullendirilir. Deger negatife dondugu
+  # anda "elde kalan adet" bir CEZA olur ve lot kisitinin gölge fiyati negatife
+  # doner. Temizligi ayri bir motor yapmayan mekanizma budur.
+  temizlik:
+    # Kac gun kala temizlik rejimine gecilir (SPEC 5: `clearance.trigger_days`).
+    # Bu esik lotun DEGERINI belirler; teklif edilebilirligi degil.
+    tetik_gun: 120
+    # Deger dusus egrisi (SPEC 5: `clearance.salvage_curve`). u = kalan/tetik:
+    #   lineer        : v = -imha + (normal + imha) * u
+    #   eksponansiyel : v = -imha + (normal + imha) * u**egri_ussu   (gec coker)
+    #   basamakli     : u >= basamak_esigi ise normal, degilse -imha
+    deger_egrisi: lineer
+    # `eksponansiyel` egrinin ussu. >1 degeri gec dusurur (son ana kadar
+    # normal marj bekler), <1 erken dusurur.
+    egri_ussu: 2.0
+    # `basamakli` egrinin esigi (u cinsinden). Egri lineer/eksponansiyel iken
+    # okunmaz ama config'te durur: egri tipini degistirmek tek satirlik olsun.
+    basamak_esigi: 0.50
+    # SPEC 2.5 kuplaji:
+    #     max_teklif_adedi = tuketim_hizi * (kalan_gun - eczaci_marji) * bu
+    # (SPEC 5: `clearance.safety_factor`). Tuketim hizi M2'nin ciktisidir
+    # (features/hiz.py -> OriginGorunumu.hiz_tahmini); SABIT BIR TAVAN YOK.
+    guvenlik_katsayisi: 0.70
+    # Eczacinin kabul edecegi minimum kalan raf omru (SPEC 5:
+    # `clearance.pharmacist_margin_days`). Yukaridaki formulden dusulur:
+    # eczaci miadin son gunune kadar satmayi planlamaz. Sonuc sifir veya
+    # negatifse o eczane o lot icin ADAY DEGILDIR, iskonto ne kadar derin
+    # olursa olsun. Bu politikanin INANCIDIR; dunyanin karsiligi
+    # `sim.iade.eczaci_guvenlik_marji_gun` ve ikisi ayri knob'tur.
+    eczaci_marji_gun: 30.0
+    # Temizlik rejiminde gevsetilen raf omru tabani. Normal rejimde
+    # `politika.kisit.asgari_kalan_raf_omru_gun` (120) baglar; temizlikte bu
+    # taban gecerlidir. Sifir yapilamaz: hangi rejimde olursa olsun eczaneye
+    # miadi dolmak uzere mal yikilmaz.
+    asgari_kalan_raf_omru_gun: 45.0
+    # POLITIKANIN imha maliyeti inanci (SPEC 5: `disposal_cost_per_unit`),
+    # DSF orani olarak. Dunyanin karsiligi `lot.maliyet.imha_birim_maliyeti_
+    # dsf_orani`; ikisi AYRI knob cunku politikanin maliyeti bilmesi ile
+    # dunyanin onu uygulamasi ayri seylerdir (TUNING.md M3-A4 disiplini).
+    # Varsayilan dunyanin degeriyle AYNI (0.08) secildi: politikanin inanci
+    # dogruyken bile temizligin ne kazandirdigi olculsun, sonra yanlis inancin
+    # bedeli ayrica supurulsun.
+    imha_birim_maliyeti_dsf_orani: 0.08
+    # Teklif edilmeyip depoda kalan bir adedin ileride ORGANIK talep tarafindan
+    # normal marjla satilma olasiligi. Lotun "normal" devam degeri:
+    #     v = dsf * depo_kar_marji * bu
+    # 1.0 = depoda kalan her adet nasilsa satilir (stok hic riskli degil);
+    # 0.0 = teklif edilmeyen adet degersiz (her sey bugun satilmali).
+    normal_realizasyon_orani: 0.85
+
+  # ==========================================================================
+  # SENARYOLAR
+  # ==========================================================================
+  # Dunyayi DEGISTIRMEZ; origin gorunumune uygulanir. Boylece ayni dunya
+  # uzerinde "stok kit olsaydi" / "depo yaslanmis olsaydi" sorulari sorulur ve
+  # dunya_hash sabit kalir.
+  senaryo:
+    # Tahsis edilebilir lot adetleri bu katsayiyla olceklenir. 1.0 = dokunma.
+    # Kitlik senaryosu (SPEC M5 cikis kriteri (a)) bu kadrandan uretilir:
+    # dogal dunyada aday talebi stogu yalnizca 2 SKU'da asiyor, o yuzden
+    # ranking-only ile LP arasindaki fark gorunmez kaliyor.
+    kit_stok_carpani: 1.0
+    # Butun lotlarin kalan raf omrunden dusulen gun. 0 = dokunma. Kisa miatli
+    # lot senaryosu (cikis kriteri (b)) bu kadrandan uretilir: depoyu
+    # yaslandirmak, miad baskisini dogal dagilimin otesine tasir.
+    miad_hizlandirma_gun: 0
+
+  degerlendirme:
+    # Karsilama simulasyonunun tekrar sayisi. Politikalar TAHMIN EDILEN
+    # olasilikla plan yapar, olcum GERCEK olasilikla ornekler: stockout bu
+    # farktan doğar. Tek ornekte stockout sayisi gurultudur.
+    ornek_sayisi: 20
+    ornek_seed: 50260812
+    # Depoda kalan adedin miada kadar organik talep tarafindan ne kadar
+    # tuketilecegi, SKU'nun son bu kadar haftalik sevk hizindan projelendirilir.
+    # Kapali dongu degil (o M6); imha projeksiyonunun tabani.
+    organik_cikis_pencere_hafta: 26

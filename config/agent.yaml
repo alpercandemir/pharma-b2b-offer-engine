@@ -1,0 +1,47 @@
+# M7 LLM katmani. D8: "LLM karar noktasinda YOKTUR; orkestrasyon, aciklama
+# ve senaryo yorumundadir."
+#
+# Bu dosyadaki hicbir knob bir KARARI degistirmez. Teklif listesi, kol
+# secimi ve kisit vetosu M3-M6 tarafindan uretilir ve bu katman onlari
+# yalnizca OKUR. D8 mekanik olarak da kilitli: `agent/tools.py` ve
+# `agent/narrative.py` policy/ models/ sim/ modullerinden hicbirini import
+# EDEMEZ (scripts/verify_m7.py kaynak taramasi). Import ederlerse kosu duser.
+#
+# DETERMINIZM. CLAUDE.md 5 "iki kez calistirinca ayni sonuc" diyor; bir dil
+# modeli bunu garanti edemez. Cozum: harness canli API'ya bagli DEGIL,
+# KAYITLI konusmalari oynatir (`istemci: kayitli`). Canli kosu ayri bir
+# komuttur, kaydini dosyaya yazar ve regresyon o kayit uzerinde kosar.
+# Boylece "LLM ciktisi deterministik olarak test ediliyor" cumlesi bir
+# temenni degil, dosya sistemine bagli bir olgu.
+
+ajan:
+  # Konusmanin nereden geldigi.
+  #   kayitli : harness/fixtures altindaki JSON kaydi oynatilir (varsayilan;
+  #             ag yok, anahtar yok, tekrar uretilebilir)
+  #   sablon  : LLM hic yok; brifing olgu paketinden deterministik sablonla
+  #             uretilir. Denetcilerin TEMIZ referansi budur
+  #   anthropic: gercek API. `--canli` ile secilir, kaydini yazar
+  istemci: kayitli
+
+  # Kayitli konusmalarin dizini (repo koku gore).
+  kayit_dizini: harness/fixtures
+
+  # --- canli API ayarlari (istemci: anthropic disinda okunmaz) ---
+  model: claude-opus-4-5
+  azami_token: 4096
+  # 0.0: ayni girdiye ayni cikti SANSI en yuksek. Garanti degil -- bu yuzden
+  # regresyon canli API'ya degil kayda bakiyor (dosya basligi).
+  sicaklik: 0.0
+  # Arac dongusunun ust siniri. Model bu kadar turda bitirmezse konusma
+  # kesilir ve harness `bicim_ihlali` bulgusu uretir; sonsuz dongu yok.
+  azami_tur: 8
+
+  # --- brifingin boyutu: olgu paketine ne giriyor ---
+  # Rejim basina brifinge giren teklif satiri. Buyutmek modele daha cok
+  # olgu verir ama uydurma yuzeyini de buyutur (her sayi bir uydurma
+  # firsati); kucultmek brifingi eksik birakir.
+  brifing_teklif_sayisi: 5
+  # Brifingde gerekcesi yazilan veto satiri sayisi ("neden bu urun yok").
+  brifing_veto_sayisi: 3
+  # `kol_ekonomisi` aracinin dondurdugu kol sayisi (en iyi N + teklif_yok).
+  kol_ekonomisi_kol_sayisi: 6

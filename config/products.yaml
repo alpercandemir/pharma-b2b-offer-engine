@@ -1,0 +1,235 @@
+# Urun evreni. SPEC 2.1.
+#
+# UYARI (SPEC 8): asagidaki fiyat seviyeleri, marj kademeleri ve regulasyon
+# olasiliklari DOGRULANMAMIS placeholder degerlerdir. POC'ta dogru olmalari
+# gerekmiyor, degistirilebilir olmalari gerekiyor. Gercek degerler icin
+# TITCK fiyat kararnamesi ve SGK Ek-4/A listesi teyit edilmeli.
+
+evren:
+  # Long tail: SKU hacim dagiliminin log-normal sigmasi. Buyudukce birkac SKU
+  # hacmin cogunu alir, uzun kuyruk uzar.
+  populerlik_log_sigma: 1.15
+  koli_ici_adet_secenekleri: [1, 5, 10, 12, 20, 24, 30]
+  koli_ici_adet_agirliklari: [0.10, 0.16, 0.26, 0.14, 0.16, 0.10, 0.08]
+  birim_hacim_log_ort: -1.2      # ln(desimetrekup); medyan ~0.30 dm3
+  birim_hacim_log_sigma: 0.55
+  kdv_orani: 0.10                # ilacta indirimli KDV; domain sabiti degil, mevzuat -> knob
+  its_olasiligi_rx: 0.98         # RX'te serilestirme neredeyse evrensel
+  its_olasiligi_rx_disi: 0.15
+
+# Depo ve eczane kar marji kademeleri. Ucuz ilacta yuksek yuzde, pahalida dusuk.
+# psf_ust_siniri null = son kademe (ustu acik).
+marj_kademeleri:
+  - { psf_ust_siniri: 25.0,   depo_marji: 0.090, eczane_marji: 0.250 }
+  - { psf_ust_siniri: 60.0,   depo_marji: 0.080, eczane_marji: 0.250 }
+  - { psf_ust_siniri: 150.0,  depo_marji: 0.070, eczane_marji: 0.240 }
+  - { psf_ust_siniri: 400.0,  depo_marji: 0.050, eczane_marji: 0.200 }
+  - { psf_ust_siniri: null,   depo_marji: 0.030, eczane_marji: 0.160 }
+
+# promosyon_serbest turetme kurali. SPEC 2.1 "genelde serbest" diyor; kural
+# burada acik yazilir, kodda hardcode edilmez.
+promosyon_serbest_kurali:
+  recete_rengi_vetosu: [KIRMIZI, YESIL]        # bu renklerde her kosulda yasak
+  urun_tipi_serbest: [OTC, TEG, DERMOKOZMETIK, MEDIKAL]
+  rx_sgk_disi_serbest: true                    # RX ama geri odeme disi -> serbest
+  rx_sgk_kapsaminda_serbest: false             # RX + SGK -> serbest degil
+
+kategoriler:
+  - kod: J01
+    ad: "Sistemik antibakteriyel"
+    atc_prefix: "J01"
+    pay: 0.11
+    urun_tipi_dagilimi: { RX: 1.0 }
+    akut: true
+    kronik: false
+    soguk_zincir_olasiligi: 0.02
+    mevsimsellik: [1.50, 1.40, 1.25, 1.00, 0.80, 0.62, 0.55, 0.60, 0.85, 1.20, 1.45, 1.52]
+    ramazan_carpani: 1.00
+    miad_toleransi_carpani: 1.10
+    etken_madde_orani: 0.40
+    fiyat_log_ort: 4.80
+    fiyat_log_sigma: 0.70
+    recete_rengi_dagilimi: { NORMAL: 1.00, KIRMIZI: 0.00, YESIL: 0.00, MOR: 0.00, TURUNCU: 0.00 }
+    sgk_olasiligi: 0.90
+    tedarik_guclugu_olasiligi: 0.06
+
+  - kod: R05
+    ad: "Oksuruk ve soguk alginligi"
+    atc_prefix: "R05"
+    pay: 0.09
+    urun_tipi_dagilimi: { RX: 0.35, OTC: 0.65 }
+    akut: true
+    kronik: false
+    soguk_zincir_olasiligi: 0.00
+    mevsimsellik: [1.70, 1.55, 1.30, 0.95, 0.70, 0.50, 0.45, 0.52, 0.90, 1.35, 1.62, 1.75]
+    ramazan_carpani: 1.00
+    miad_toleransi_carpani: 1.25
+    etken_madde_orani: 0.45
+    fiyat_log_ort: 4.10
+    fiyat_log_sigma: 0.60
+    recete_rengi_dagilimi: { NORMAL: 1.00, KIRMIZI: 0.00, YESIL: 0.00, MOR: 0.00, TURUNCU: 0.00 }
+    sgk_olasiligi: 0.55
+    tedarik_guclugu_olasiligi: 0.04
+
+  - kod: R06
+    ad: "Sistemik antihistaminik"
+    atc_prefix: "R06"
+    pay: 0.06
+    urun_tipi_dagilimi: { RX: 0.45, OTC: 0.55 }
+    akut: true
+    kronik: false
+    soguk_zincir_olasiligi: 0.00
+    mevsimsellik: [0.70, 0.80, 1.50, 2.00, 2.10, 1.40, 0.90, 0.80, 0.90, 0.88, 0.75, 0.70]
+    ramazan_carpani: 1.00
+    miad_toleransi_carpani: 1.20
+    etken_madde_orani: 0.40
+    fiyat_log_ort: 4.45
+    fiyat_log_sigma: 0.55
+    recete_rengi_dagilimi: { NORMAL: 1.00, KIRMIZI: 0.00, YESIL: 0.00, MOR: 0.00, TURUNCU: 0.00 }
+    sgk_olasiligi: 0.60
+    tedarik_guclugu_olasiligi: 0.03
+
+  - kod: N02
+    ad: "Analjezik"
+    atc_prefix: "N02"
+    pay: 0.09
+    urun_tipi_dagilimi: { RX: 0.40, OTC: 0.60 }
+    akut: true
+    kronik: false
+    soguk_zincir_olasiligi: 0.00
+    mevsimsellik: [1.15, 1.10, 1.05, 1.00, 0.95, 0.92, 0.90, 0.92, 1.00, 1.05, 1.10, 1.15]
+    ramazan_carpani: 1.08
+    miad_toleransi_carpani: 0.95
+    etken_madde_orani: 0.35
+    fiyat_log_ort: 3.80
+    fiyat_log_sigma: 0.65
+    # Opioid analjezikler kirmizi, bazi kombinasyonlar yesil recete.
+    recete_rengi_dagilimi: { NORMAL: 0.84, KIRMIZI: 0.09, YESIL: 0.05, MOR: 0.01, TURUNCU: 0.01 }
+    sgk_olasiligi: 0.70
+    tedarik_guclugu_olasiligi: 0.05
+
+  - kod: A02
+    ad: "Antiasit ve antiulser"
+    atc_prefix: "A02"
+    pay: 0.07
+    urun_tipi_dagilimi: { RX: 0.55, OTC: 0.45 }
+    akut: false
+    kronik: false
+    soguk_zincir_olasiligi: 0.00
+    mevsimsellik: [1.00, 1.00, 1.02, 1.00, 0.98, 0.98, 0.98, 1.00, 1.02, 1.02, 1.00, 1.00]
+    ramazan_carpani: 1.35
+    miad_toleransi_carpani: 0.90
+    etken_madde_orani: 0.35
+    fiyat_log_ort: 4.25
+    fiyat_log_sigma: 0.55
+    recete_rengi_dagilimi: { NORMAL: 1.00, KIRMIZI: 0.00, YESIL: 0.00, MOR: 0.00, TURUNCU: 0.00 }
+    sgk_olasiligi: 0.75
+    tedarik_guclugu_olasiligi: 0.04
+
+  - kod: C09
+    ad: "Antihipertansif (RAS etkili)"
+    atc_prefix: "C09"
+    pay: 0.12
+    urun_tipi_dagilimi: { RX: 1.0 }
+    akut: false
+    kronik: true
+    soguk_zincir_olasiligi: 0.00
+    mevsimsellik: [1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00]
+    ramazan_carpani: 1.00
+    miad_toleransi_carpani: 0.70
+    etken_madde_orani: 0.30
+    fiyat_log_ort: 4.50
+    fiyat_log_sigma: 0.60
+    recete_rengi_dagilimi: { NORMAL: 1.00, KIRMIZI: 0.00, YESIL: 0.00, MOR: 0.00, TURUNCU: 0.00 }
+    sgk_olasiligi: 0.95
+    tedarik_guclugu_olasiligi: 0.05
+
+  - kod: A10
+    ad: "Antidiyabetik"
+    atc_prefix: "A10"
+    pay: 0.10
+    urun_tipi_dagilimi: { RX: 1.0 }
+    akut: false
+    kronik: true
+    soguk_zincir_olasiligi: 0.35       # insulinler
+    mevsimsellik: [1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00]
+    ramazan_carpani: 1.00
+    miad_toleransi_carpani: 0.70
+    etken_madde_orani: 0.30
+    fiyat_log_ort: 5.50
+    fiyat_log_sigma: 0.75
+    recete_rengi_dagilimi: { NORMAL: 1.00, KIRMIZI: 0.00, YESIL: 0.00, MOR: 0.00, TURUNCU: 0.00 }
+    sgk_olasiligi: 0.96
+    tedarik_guclugu_olasiligi: 0.09
+
+  - kod: J07
+    ad: "Asi"
+    atc_prefix: "J07"
+    pay: 0.03
+    urun_tipi_dagilimi: { RX: 1.0 }
+    akut: false
+    kronik: false
+    soguk_zincir_olasiligi: 1.00
+    mevsimsellik: [0.20, 0.15, 0.15, 0.15, 0.15, 0.20, 0.30, 0.80, 2.50, 3.00, 2.00, 0.60]
+    ramazan_carpani: 1.00
+    miad_toleransi_carpani: 1.45      # dar pencere; soguk zincirde miad kritik
+    etken_madde_orani: 0.70
+    fiyat_log_ort: 6.00
+    fiyat_log_sigma: 0.55
+    recete_rengi_dagilimi: { NORMAL: 1.00, KIRMIZI: 0.00, YESIL: 0.00, MOR: 0.00, TURUNCU: 0.00 }
+    sgk_olasiligi: 0.80
+    tedarik_guclugu_olasiligi: 0.14
+
+  - kod: DERMO
+    ad: "Dermokozmetik"
+    atc_prefix: null
+    pay: 0.12
+    urun_tipi_dagilimi: { DERMOKOZMETIK: 1.0 }
+    akut: false
+    kronik: false
+    soguk_zincir_olasiligi: 0.00
+    mevsimsellik: [0.70, 0.75, 0.90, 1.10, 1.40, 1.80, 2.00, 1.90, 1.20, 0.85, 0.75, 0.80]
+    ramazan_carpani: 1.00
+    miad_toleransi_carpani: 1.30
+    etken_madde_orani: 0.90
+    fiyat_log_ort: 5.85
+    fiyat_log_sigma: 0.60
+    recete_rengi_dagilimi: { NORMAL: 1.00, KIRMIZI: 0.00, YESIL: 0.00, MOR: 0.00, TURUNCU: 0.00 }
+    sgk_olasiligi: 0.00
+    tedarik_guclugu_olasiligi: 0.01
+
+  - kod: TEG
+    ad: "Takviye edici gida"
+    atc_prefix: null
+    pay: 0.13
+    urun_tipi_dagilimi: { TEG: 1.0 }
+    akut: false
+    kronik: false
+    soguk_zincir_olasiligi: 0.00
+    mevsimsellik: [1.20, 1.10, 1.00, 0.95, 0.90, 0.85, 0.85, 1.00, 1.40, 1.25, 1.20, 1.30]
+    ramazan_carpani: 1.30
+    miad_toleransi_carpani: 1.15
+    etken_madde_orani: 0.90
+    fiyat_log_ort: 5.50
+    fiyat_log_sigma: 0.65
+    recete_rengi_dagilimi: { NORMAL: 1.00, KIRMIZI: 0.00, YESIL: 0.00, MOR: 0.00, TURUNCU: 0.00 }
+    sgk_olasiligi: 0.00
+    tedarik_guclugu_olasiligi: 0.01
+
+  - kod: MEDIKAL
+    ad: "Medikal urun"
+    atc_prefix: null
+    pay: 0.08
+    urun_tipi_dagilimi: { MEDIKAL: 1.0 }
+    akut: false
+    kronik: false
+    soguk_zincir_olasiligi: 0.00
+    mevsimsellik: [1.05, 1.02, 1.00, 1.00, 0.98, 0.98, 0.98, 1.00, 1.02, 1.02, 1.03, 1.05]
+    ramazan_carpani: 1.00
+    miad_toleransi_carpani: 0.85
+    etken_madde_orani: 0.95
+    fiyat_log_ort: 5.20
+    fiyat_log_sigma: 0.80
+    recete_rengi_dagilimi: { NORMAL: 1.00, KIRMIZI: 0.00, YESIL: 0.00, MOR: 0.00, TURUNCU: 0.00 }
+    sgk_olasiligi: 0.20
+    tedarik_guclugu_olasiligi: 0.03

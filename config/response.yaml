@@ -1,0 +1,136 @@
+# M4 tepki katmani: teklife verilen cevabin GERCEK (latent) mekanizmasi.
+#
+# BU DOSYA SIMULATORUN PARCASIDIR. Buradaki hicbir sayi politika katmanina
+# gorunmez; `sim/response.py` bunlari okur, `policy/` ve `features/` okumaz
+# (scripts/verify_m4.py statik olarak tarar).
+#
+# NEDEN AYRI DOSYA VE NEDEN `DUNYA_BOLUMLERI`NDE DEGIL:
+# M1 dunyasi (siparis/sevkiyat/stok tablolari) teklif kavramini hic bilmiyor.
+# M4'un tepki katmani o dunyanin UZERINE, origin aninda kurulan bir katman:
+# dunyayi degistirmiyor, dolayisiyla `dunya_hash` sabit kaliyor ve M1/M2/M3
+# sonuclari gecerli kalmaya devam ediyor. M6'da kapali dongu (rollout) gelince
+# teklifler dunyayi degistirecek ve bu bolum `DUNYA_BOLUMLERI`ne girmek
+# ZORUNDA kalacak. reports/m4.md 9 (borc #1).
+#
+# CLAUDE.md 7: bu blok tepkinin ZORLUK ayaridir. Uplift heterojen olmali,
+# heterojenligin bir kismi LATENT surucularden gelmeli (share_of_wallet,
+# stokculuk) ki CATE modeli tavana carpsin.
+
+tepki:
+  # --- Teklif YOKKEN siparis verme olasiliginin logit'i ---
+  # Bu, propensity'nin kendisidir: "zaten alacak miydi".
+  taban:
+    # Logit kesme noktasi. Butun aday satirlarinin ortalama taban kabul
+    # olasiligini belirler; kalibrasyonu scripts/verify_m4.py raporlar.
+    kesme: -1.55
+    # Gercek ihtiyac katsayisi. ihtiyac = exp(-kapsama_hafta / referans).
+    # Kapsama = gercek eczane stogu / latent tuketim hizi (ground_truth).
+    ihtiyac_katsayisi: 2.10
+    ihtiyac_referans_hafta: 5.0
+    # Cesitte olmayan (o urunu hic tutmayan) hucrede ihtiyac tanimsizdir;
+    # teklif yine de yeni bir liste acabilir. Taban ihtiyac degeri.
+    cesit_disi_ihtiyac: 0.12
+    # share_of_wallet katsayisi: (sow - 0.5) * 2 olceginde. LATENT surucu.
+    sow_katsayisi: 0.85
+    # Hic siparis gecmisi olmayan hucrede ek direnc.
+    yeni_hucre_cezasi: -0.80
+    # Fiyat direnci: z(log dsf) katsayisi. Pahali kalemde tereddut artar.
+    fiyat_katsayisi: -0.18
+    # Hucre duzeyinde KALICI latent gurultu (eczanenin o urune karsi tavri).
+    # Origin'ler arasinda sabit; model asla goremez -> indirgenemez hata.
+    hucre_gurultu_sigma: 0.60
+
+  # --- Teklifin logit uzerindeki etkisi (uplift'in kaynagi) ---
+  teklif:
+    # Sadece gorunur olmanin etkisi: MF yok, vade standart. Bedelsiz aksiyon
+    # bu yuzden vardir; sifirlanirsa "teklif ver ama bir sey verme" olculu
+    # bicimde etkisiz hale gelir ve aksiyon uzayi fiilen daralir.
+    taban_etki: 0.30
+    # MF etkisi = mf_taban_etkisi * (oran/referans)^azalan_us * duyarlilik_p
+    #             * urun_tipi_carpani
+    mf_taban_etkisi: 0.90
+    mf_referans_orani: 0.05
+    # Azalan verim ussu. 1.0 = dogrusal; <1 derin MF'in marjinal etkisi duser.
+    mf_azalan_us: 0.70
+    # Vade etkisi = vade_taban_etkisi * ((vade/taban_vade)^azalan_us - 1)
+    #               * vade_duyarliligi_p
+    vade_taban_etkisi: 0.45
+    vade_azalan_us: 0.80
+    # IHTIYAC ETKILESIMI -- M4'un can damari.
+    # Teklifin TOPLAM etkisi exp(bu * ihtiyac) ile olceklenir. Katsayi
+    # NEGATIF: stogu bitmek uzere olan eczane zaten siparis verecektir (D2),
+    # teklif ona bosa gider; stogu olan eczane ise ancak bir tavizle one
+    # cekilir (SPEC 2.2 `stokculuk_egilimi`). Yani teklif esnekligi acil
+    # ihtiyacla TERS orantili.
+    #
+    # NEDEN BU KADAR ONEMLI. Bu terim olmadan uplift, taban olasiligin
+    # neredeyse SABIT bir kati olur: logit uzayinda sabit delta ile
+    # (p - p0)/p orani 0.25'ten 0.03'e ancak iniyor ve iki siralama
+    # (seviye ve artim) fiilen ayni sirayi veriyor. Olculdu: bu katsayi 0
+    # iken oracle uplift ile oracle propensity arasindaki fark yalnizca
+    # %2.9 (reports/m4.md 7.2). "Kesin alici" ile "ikna edilebilir"
+    # ayrimini uretan mekanizma budur ve gercek dunyada da bu mekanizmadir.
+    ihtiyac_etkilesimi: -1.60
+
+  # --- Heterojenlik: kim tekliflere ne kadar tepki veriyor ---
+  # CLAUDE.md 7: "Uplift heterojen olacak: segmentler tekliflere farkli tepki
+  # verecek." Katsayilarin bir kismi GOZLEMLENEBILIR surucude (model
+  # ogrenebilir), bir kismi LATENT surucude (ogrenemez).
+  duyarlilik:
+    # ANA KADRAN. Butun heterojenlik terimlerini (katsayilar + sigma) tek
+    # bir carpanla olcekler. 0.0 -> her eczane ayni tepkiyi verir ve uplift
+    # tabanli politika ile propensity tabanli politika ayni sirayi uretmeye
+    # yaklasir. Kalibrasyon egzersizi bunu supuruyor (notes/predictions.md).
+    heterojenlik_carpani: 1.0
+    # MF duyarliligi: log-normal, asagidaki surucularle kaydirilir.
+    mf_log_sigma: 0.55
+    mf_sosyoekonomik: 0.30      # gozlemlenebilir
+    mf_olcek: -0.35             # gozlemlenebilir; kucuk eczane MF'e daha duyarli
+    mf_sow: -0.50               # LATENT: bizden zaten cok alan MF'e az tepki verir
+    # Vade duyarliligi: nakit sikisikligi surucusu.
+    vade_log_sigma: 0.50
+    vade_riski: 0.85            # gozlemlenebilir
+    vade_dbs: -0.40             # gozlemlenebilir; limiti genis olan vadeye kayitsiz
+    vade_stokculuk: 0.30        # LATENT
+
+  # MF kanalinin urun tipine gore gucu. RX'te promosyon zaten kisitli
+  # (SPEC 2.1); TEG/DERMOKOZMETIK kampanya mantiginin asil yasadigi yer.
+  urun_tipi_mf_carpani:
+    RX: 0.35
+    OTC: 1.00
+    TEG: 1.15
+    DERMOKOZMETIK: 1.25
+    MEDIKAL: 0.80
+
+  # --- Alici tarafi direnci (SPEC 2.5) ---
+  miad:
+    # Teklif edilen lotun kalan raf omru eczacinin toleransinin altina
+    # dustukce kabul olasiligi duser. eksik_oran = max(0, 1 - kalan/gerekli).
+    direnc_katsayisi: -1.40
+
+  # --- Kabul edilen miktar ---
+  miktar:
+    # Eczane teklif edilen adedi birebir almaz; log-normal carpan.
+    # Kabul OLASILIGINI degil, gerceklesen marjin varyansini etkiler.
+    kabul_gurultu_sigma: 0.35
+    asgari_kabul_orani: 0.25
+    # ASIRI ADET DIRENCI. Teklif edilen adet eczanenin kapsama hedefini
+    # astikca kabul olasiligi duser: eczaci satamayacagi mali almaz
+    # (SPEC 2.5 alici tarafi direnci).
+    #
+    # BU TERIM OLMADAN MARJ METRIGI SOMURULEBILIR: tepki adete bagli
+    # olmayinca "teklif adedini buyut" sinirsiz bir marj kaldiraci olur ve
+    # `aday.hiz_telafi_katsayisi` ile `aday.teklif_kapsama_hafta` sahte bir
+    # optimuma kosar. Olculdu: telafi 1.0 -> 4.0 yapildiginda artimsal marj
+    # 13.5k -> 35.8k'ya cikiyordu, tek fren kisit katmanindaki emilim
+    # tavaniydi (reports/m4.md 7.4).
+    asiri_adet_direnci: -0.55
+    # Kapsama hedefinin bu katina kadar direnc yok.
+    kapsama_toleransi: 2.0
+    # Direncin uygulanmaya baslayacagi ASGARI adet. Bu taban olmadan hic
+    # tuketimi olmayan hucrede esik sifira gider ve her teklif sonsuz
+    # dirence carpar: yeni cesit acan teklifler yapisal olarak imkansiz
+    # olurdu. Eczaci birkac kutuluk bir denemeyi her halukarda degerlendirir
+    # (dunyanin karsiligi `sim.talep.cesitlendirme.yeni_cesit_deneme_adedi`,
+    # ama o siparis tarafinin knob'u; bu tepki tarafinin).
+    asgari_esik_adet: 6.0
