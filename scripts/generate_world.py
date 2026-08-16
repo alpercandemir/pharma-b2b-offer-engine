@@ -11,9 +11,9 @@ import time
 
 import polars as pl
 
-from core.config import config_yukle
-from core.io import Kosu
-from core.rng import SeedBankasi
+from core.config import load_config
+from core.io import Run
+from core.rng import SeedBank
 from sim.world import dunya_kos
 
 
@@ -33,19 +33,19 @@ def _knob_ayristir(ham: list[str]) -> dict[str, object]:
     return cikti
 
 
-def dunya_yaz(cfg, kosu: Kosu, gecersiz: dict | None = None) -> dict:
+def dunya_yaz(cfg, kosu: Run, gecersiz: dict | None = None) -> dict:
     """Dunyayi uretir, kosu dizinine yazar, manifest'i dondurur.
 
     M2'den itibaren experiments/run.py de bu fonksiyonu cagirir; yazma yolu
     tek yerde kalsin diye ayrildi (gozlemlenebilirlik siniri core/io.py'de
     yazma aninda zorlanir).
     """
-    seedler = SeedBankasi(cfg.profil.temel_seed)
+    seedler = SeedBank(cfg.profil.temel_seed)
     t0 = time.perf_counter()
     d = dunya_kos(cfg, seedler)
     sure = time.perf_counter() - t0
 
-    kosu.hazirla()
+    kosu.prepare()
     gozlemlenebilir = {
         "urunler": d.urunler,
         "eczaneler": d.eczaneler,
@@ -70,9 +70,9 @@ def dunya_yaz(cfg, kosu: Kosu, gecersiz: dict | None = None) -> dict:
         "tukenme_olaylari": d.tukenme_olaylari,
     }
     for ad, df in gozlemlenebilir.items():
-        kosu.yaz_gozlemlenebilir(ad, df)
+        kosu.write_observable(ad, df)
     for ad, df in gercek.items():
-        kosu.yaz_gercek(ad, df)
+        kosu.write_ground_truth(ad, df)
 
     manifest = {
         "profil": cfg.profil.ad,
@@ -84,10 +84,10 @@ def dunya_yaz(cfg, kosu: Kosu, gecersiz: dict | None = None) -> dict:
         "sku_sayisi": cfg.profil.sku_sayisi,
         "hafta_sayisi": cfg.profil.hafta_sayisi,
         "kosu_suresi_sn": round(sure, 2),
-        "seed_tohumlari": seedler.verilen,
+        "seed_tohumlari": seedler.issued,
         "satir_sayilari": {ad: df.height for ad, df in {**gozlemlenebilir, **gercek}.items()},
     }
-    kosu.manifest_yaz(manifest)
+    kosu.write_manifest(manifest)
     manifest["_tablolar"] = (list(gozlemlenebilir), list(gercek),
                              [df.height for df in gozlemlenebilir.values()],
                              [df.height for df in gercek.values()])
@@ -105,9 +105,9 @@ def main() -> None:
     gecersiz = _knob_ayristir(args.knob)
     if args.seed is not None:
         gecersiz["profil.temel_seed"] = args.seed
-    cfg = config_yukle(args.profil, gecersiz_kilma=gecersiz)
+    cfg = load_config(args.profil, gecersiz_kilma=gecersiz)
 
-    kosu = Kosu(args.kosu or cfg.profil.ad)
+    kosu = Run(args.kosu or cfg.profil.ad)
     manifest = dunya_yaz(cfg, kosu, gecersiz)
     gozlemlenebilir, gercek, g_satir, t_satir = manifest["_tablolar"]
     sure = manifest["kosu_suresi_sn"]

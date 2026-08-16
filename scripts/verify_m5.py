@@ -36,16 +36,16 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
 
-from core.config import Config, config_yukle  # noqa: E402
-from core.io import VERI_DIZINI, Kosu  # noqa: E402
+from core.config import Config, load_config  # noqa: E402
+from core.io import DATA_DIR, Run  # noqa: E402
 from eval import allocation as ev  # noqa: E402
 from experiments.run import (m4_boru_hatti, m5_boru_hatti,  # noqa: E402
                              m5_duz_metrikler, m5_ihlaller)
 from policy import allocate as alloc  # noqa: E402
 from scripts.verify_m2 import kod_metni  # noqa: E402
 
-KOK = Path(__file__).resolve().parent.parent
-SEKIL_DIZINI = KOK / "reports" / "figures" / "m5"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SEKIL_DIZINI = REPO_ROOT / "reports" / "figures" / "m5"
 
 # --- CIKIS KRITERI ESIKLERI. Tuning knob'u DEGIL, kriterin kendisi. ---
 # Kit senaryoda LP'nin karsilanmayan talebi ranking-only'nin en fazla bu kadari
@@ -94,10 +94,10 @@ def senaryo_configleri(profil: str) -> dict[str, Config]:
     `kisa_miat`: butun lotlar yaslandirilir (cikis kriteri (b)).
     """
     return {
-        "dogal": config_yukle(profil),
-        "kit_stok": config_yukle(profil, gecersiz_kilma={
+        "dogal": load_config(profil),
+        "kit_stok": load_config(profil, gecersiz_kilma={
             "tahsis.senaryo.kit_stok_carpani": 0.25}),
-        "kisa_miat": config_yukle(profil, gecersiz_kilma={
+        "kisa_miat": load_config(profil, gecersiz_kilma={
             "tahsis.senaryo.miad_hizlandirma_gun": 60}),
     }
 
@@ -113,7 +113,7 @@ def kontrol_tepki_sizintisi() -> Kontrol:
     sonucu tahsisten degil, bilgiden gelirdi.
     """
     bulgular = []
-    for yol in (KOK / "policy" / "allocate.py",):
+    for yol in (REPO_ROOT / "policy" / "allocate.py",):
         kod = kod_metni(yol)
         bulgular += [f"{yol.name}:{k}" for k in YASAK_TEPKI_ADLARI if k in kod]
     return Kontrol("Tahsis katmani tepki fonksiyonunu / ground_truth'u gormuyor",
@@ -185,7 +185,7 @@ def kontrol_golge_fiyat_tutarliligi(c, cfg: Config) -> Kontrol:
 
 def kontrol_determinizm(cfg: Config, m4, kosu_adi: str) -> Kontrol:
     def _ozet():
-        c = m5_boru_hatti(cfg, m4, kosu_adi, VERI_DIZINI)
+        c = m5_boru_hatti(cfg, m4, kosu_adi, DATA_DIR)
         d = m5_duz_metrikler(c, cfg, m4)
         return tuple(round(d[k], 6) for k in
                      ("m5.a.stockout_farki", "m5.a.net_marj_farki",
@@ -480,7 +480,7 @@ def main() -> None:
     ap.add_argument("--hizli", action="store_true", help="determinizm kontrolunu atla")
     args = ap.parse_args()
 
-    manifest = Kosu(args.kosu).manifest_oku()
+    manifest = Run(args.kosu).read_manifest()
     profil = args.profil or manifest["profil"]
     configler = senaryo_configleri(profil)
     temel = configler["dogal"]
@@ -488,13 +488,13 @@ def main() -> None:
           f"m5_config_hash={temel.hash()}")
 
     # M4 bir kez: `tahsis` blogu M4'un hicbir ciktisini etkilemiyor.
-    m4 = m4_boru_hatti(temel, args.kosu, VERI_DIZINI)
+    m4 = m4_boru_hatti(temel, args.kosu, DATA_DIR)
     print(f"M4 yeniden kullanildi: olcum origin={m4.olcum_originleri}, "
           f"{sum(b.teklifler.height for b in m4.bloklar)} vetosuz aday satiri")
 
     ciktilar, duzler = {}, {}
     for ad, cfg in configler.items():
-        c = m5_boru_hatti(cfg, m4, args.kosu, VERI_DIZINI)
+        c = m5_boru_hatti(cfg, m4, args.kosu, DATA_DIR)
         c.blok_haritasi = {b.gor.t: b for b in m4.bloklar}
         ciktilar[ad], duzler[ad] = c, m5_duz_metrikler(c, cfg, m4)
         print(f"\n=== SENARYO: {ad} "

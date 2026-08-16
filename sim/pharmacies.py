@@ -16,7 +16,7 @@ import numpy as np
 import polars as pl
 
 from core.config import Config
-from core.rng import SeedBankasi, agirlikli_secim
+from core.rng import SeedBank, weighted_choice
 
 # Sosyoekonomik index [0, 1] araliginda uretilir; affinite formulunde [-1, +1]
 # olceginde kullanilir (config/pharmacies.yaml basindaki formul). Donusum sabiti.
@@ -56,8 +56,8 @@ class EczaneEvreni:
         self.turizm = turizm
 
 
-def eczane_evreni_kur(cfg: Config, seedler: SeedBankasi) -> EczaneEvreni:
-    rng = seedler.uretec("eczane_evreni")
+def eczane_evreni_kur(cfg: Config, seedler: SeedBank) -> EczaneEvreni:
+    rng = seedler.generator("eczane_evreni")
     P = cfg.profil.eczane_sayisi
     ec = cfg.eczane
 
@@ -87,7 +87,7 @@ def eczane_evreni_kur(cfg: Config, seedler: SeedBankasi) -> EczaneEvreni:
     bant_adlari = np.array(["S", "M", "L", "XL"])
     ciro_bandi = bant_adlari[np.searchsorted(sinirlar, buyukluk, side="right")]
 
-    nobet_periyot = agirlikli_secim(
+    nobet_periyot = weighted_choice(
         rng, ec.nobet.rotasyon_periyodu_gun_secenekleri,
         ec.nobet.rotasyon_periyodu_agirliklari, P,
     ).astype(np.int64)
@@ -142,7 +142,7 @@ def eczane_evreni_kur(cfg: Config, seedler: SeedBankasi) -> EczaneEvreni:
         sd.kapsama_hafta_min,
         rng.normal(sd.kapsama_hafta_ort, sd.kapsama_hafta_sigma, P),
     )
-    gozden_gecirme = agirlikli_secim(
+    gozden_gecirme = weighted_choice(
         rng, sd.gozden_gecirme_periyodu_secenekleri,
         sd.gozden_gecirme_periyodu_agirliklari, P,
     ).astype(np.int64)

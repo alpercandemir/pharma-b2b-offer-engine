@@ -24,7 +24,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from core.config import Config, config_yukle
+from core.config import Config, load_config
 from eval import ope as ev
 from policy import bandit
 from policy.scorer import TEKLIF_YOK
@@ -34,7 +34,7 @@ PROFIL = "fast"
 
 @pytest.fixture(scope="module")
 def cfg():
-    return config_yukle(PROFIL)
+    return load_config(PROFIL)
 
 
 def _veri(n=200, A=4, seed=7, sicaklik=1.0) -> ev.LoglanmisVeri:
@@ -225,7 +225,7 @@ def test_propensity_loglanan_kaynagi_gercegi_aynen_veriyor(cfg):
     """
     v = _veri(seed=29)
     # Alt kirpma gercek propensity'yi kesmesin diye taban dusuruluyor.
-    c = config_yukle(PROFIL, gecersiz_kilma={"ope.propensity.kirpma_alt": 1e-6})
+    c = load_config(PROFIL, gecersiz_kilma={"ope.propensity.kirpma_alt": 1e-6})
     p = ev.propensity_hazirla(c, v)
     assert p.propensity == pytest.approx(v.propensity)
     assert p.ortalama_mutlak_hata == pytest.approx(0.0)
@@ -257,7 +257,7 @@ def test_ortusme_ihlali_esikle_tutarli(cfg):
     ag = ev.onem_agirligi(hedef, v, v.propensity, 20.0)
     oranlar = []
     for esik in (0.01, 0.10, 0.30):
-        c = config_yukle(PROFIL, gecersiz_kilma={"ope.ortusme.esik": esik})
+        c = load_config(PROFIL, gecersiz_kilma={"ope.ortusme.esik": esik})
         oranlar.append(ev.teshis(c, v, hedef, ag, v.pi_log).ortusme_ihlali_orani)
     assert oranlar == sorted(oranlar)
     assert oranlar[-1] > oranlar[0]
@@ -273,31 +273,31 @@ def test_ortusme_kilidi_olu_teshisi_reddediyor():
     yok" diye gecerdi -- sorunun yoklugu degil, olcunun yoklugu.
     """
     with pytest.raises(Exception, match="ortusme"):
-        config_yukle(PROFIL, gecersiz_kilma={"ope.ortusme.esik": 1e-6})
+        load_config(PROFIL, gecersiz_kilma={"ope.ortusme.esik": 1e-6})
 
 
 def test_rollout_penceresi_dunyayi_asamaz():
     with pytest.raises(Exception, match="rollout penceresi"):
-        config_yukle(PROFIL, gecersiz_kilma={"ope.rollout.baslangic_hafta": 90})
+        load_config(PROFIL, gecersiz_kilma={"ope.rollout.baslangic_hafta": 90})
 
 
 def test_raporlanan_ufuk_kosulmamis_haftayi_etiketleyemez():
     with pytest.raises(Exception, match="raporlanan_ufuklar"):
-        config_yukle(PROFIL, gecersiz_kilma={"ope.rollout.ufuk_hafta": 10})
+        load_config(PROFIL, gecersiz_kilma={"ope.rollout.ufuk_hafta": 10})
 
 
 def test_rollout_taban_politikasi_zorunlu():
     with pytest.raises(Exception, match="teklif_yok"):
-        config_yukle(PROFIL, gecersiz_kilma={
+        load_config(PROFIL, gecersiz_kilma={
             "ope.rollout.politikalar": ["uplift_x"]})
 
 
 def test_rollout_tanimsiz_politika_reddediliyor():
     with pytest.raises(Exception, match="tanimsiz ad"):
-        config_yukle(PROFIL, gecersiz_kilma={
+        load_config(PROFIL, gecersiz_kilma={
             "ope.rollout.politikalar": ["teklif_yok", "sihirli_politika"]})
 
 
 def test_kirpma_esigi_bir_altinda_reddediliyor():
     with pytest.raises(Exception, match="kirpma"):
-        config_yukle(PROFIL, gecersiz_kilma={"ope.tahminci.kirpma_esigi": 0.5})
+        load_config(PROFIL, gecersiz_kilma={"ope.tahminci.kirpma_esigi": 0.5})

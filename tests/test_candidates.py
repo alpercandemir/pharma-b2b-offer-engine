@@ -12,21 +12,21 @@ import numpy as np
 import polars as pl
 import pytest
 
-from core.config import config_yukle
-from core.io import Kosu
+from core.config import load_config
+from core.io import Run
 from features.okuma import GozlemlenebilirKaynak
 from policy import candidates as ad
 from scripts.generate_world import dunya_yaz
 from scripts.verify_m2 import YASAK_ADLAR, kod_metni
 
-KOK = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 @pytest.fixture(scope="module")
 def kucuk_dunya(tmp_path_factory):
-    cfg = config_yukle("fast")
+    cfg = load_config("fast")
     kok = tmp_path_factory.mktemp("dunya")
-    dunya_yaz(cfg, Kosu("t", kok=kok))
+    dunya_yaz(cfg, Run("t", kok=kok))
     return cfg, kok
 
 
@@ -46,7 +46,7 @@ def test_politika_katmani_ground_truth_okumuyor():
     eval/aday.py'de kurulur.
     """
     bulgular = []
-    for yol in sorted((KOK / "policy").glob("*.py")):
+    for yol in sorted((REPO_ROOT / "policy").glob("*.py")):
         kod = kod_metni(yol)
         bulgular += [f"{yol.name}:{k}" for k in YASAK_ADLAR if k in kod]
     assert not bulgular, f"politika katmani ground_truth'a dokunuyor: {bulgular}"
@@ -63,12 +63,12 @@ def test_point_in_time_gelecek_silinince_skorlar_degismiyor(kucuk_dunya, tmp_pat
     dunya = ad.dunya_yukle(kaynak, cfg)
     kesme = dunya.W // 2
 
-    kesik_kosu = Kosu("kesik", kok=tmp_path).hazirla()
-    for tablo in kaynak.tablolar():
+    kesik_kosu = Run("kesik", kok=tmp_path).prepare()
+    for tablo in kaynak.tables():
         df = kaynak.tablo(tablo)
         if "hafta" in df.columns:
             df = df.filter(pl.col("hafta") <= kesme)
-        kesik_kosu.yaz_gozlemlenebilir(tablo, df)
+        kesik_kosu.write_observable(tablo, df)
     kesik = ad.dunya_yukle(GozlemlenebilirKaynak("kesik", kok=tmp_path), cfg)
 
     tam_gor = ad.gorunum_kur(dunya, cfg, kesme)
@@ -166,7 +166,7 @@ def test_hibrit_karisim_agirligi_sirayi_degistiriyor(hazirlik):
     skorlar = ad.uretici_skorlari(dunya, cfg, gor)
     # Miad carpani SKU bazli bir carpan; yalnizca karisimin sirasini sinamak
     # icin kapatilir (carpanin kendi testi tests/test_constraints.py'de).
-    carpansiz = config_yukle("fast", gecersiz_kilma={
+    carpansiz = load_config("fast", gecersiz_kilma={
         **{f"politika.aday.karisim_agirliklari.{u}": (1.0 if u == "cf" else 0.0)
            for u in cfg.politika.aday.URETICILER},
         "politika.aday.miad_baskisi_agirligi": 0.0})

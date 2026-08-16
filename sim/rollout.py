@@ -43,7 +43,7 @@ import numpy as np
 import polars as pl
 
 from core.config import Config
-from core.rng import SeedBankasi
+from core.rng import SeedBank
 from policy.candidates import AdayDunyasi
 from policy.scorer import TEKLIF_YOK, TeklifMatrisleri, brut_marj
 from sim.calendar import GUN_HAFTA
@@ -198,7 +198,7 @@ def _bos_teklif_sonucu(P: int, S: int) -> TeklifSonucu:
         brut_marj=0.0, ortalama_mf=float("nan"), ortalama_vade=float("nan"))
 
 
-def teklifi_uygula(cfg: Config, durum: DunyaDurumu, seedler: SeedBankasi,
+def teklifi_uygula(cfg: Config, durum: DunyaDurumu, seedler: SeedBank,
                    plan: TeklifPlani, tepki: Tepki, w: int,
                    p_tahmin: np.ndarray | None = None) -> TeklifSonucu:
     """Kabul ornekler, depodan tahsis eder, sevkiyat matrisini uretir.
@@ -425,7 +425,7 @@ def rollout_kos(cfg: Config, durum: DunyaDurumu, evren: TepkiEvreni,
     SPEC 5'in ogretici karsitligi birincisidir.
     """
     r = cfg.ope.rollout
-    seedler = SeedBankasi(r.seed)
+    seedler = SeedBank(r.seed)
     baslangic = durum.w
     ecz_id = eczaneler["eczane_id"].to_numpy()
     sku_id = urunler["sku_id"].to_numpy()
@@ -465,7 +465,7 @@ def rollout_kos(cfg: Config, durum: DunyaDurumu, evren: TepkiEvreni,
                  "imha": len(durum.kayit.imha_kayit),
                  "siparis": len(durum.kayit.siparis_kayit)}
 
-        durum.rng = seedler.uretec(f"rollout_dunya_{w}")
+        durum.rng = seedler.generator(f"rollout_dunya_{w}")
         hafta_adimi(durum, teklif_sevk=ts.sevk,
                     teklif_miad_agirlikli=ts.miad_agirlikli)
         olcum.haftalar.append(_hafta_olcumu(cfg, durum, w, ts, imleç))

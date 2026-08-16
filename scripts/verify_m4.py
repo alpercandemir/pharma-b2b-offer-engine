@@ -36,9 +36,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
 
-from core.config import Config, config_yukle  # noqa: E402
-from core.io import VERI_DIZINI, Kosu  # noqa: E402
-from core.rng import SeedBankasi  # noqa: E402
+from core.config import Config, load_config  # noqa: E402
+from core.io import DATA_DIR, Run  # noqa: E402
+from core.rng import SeedBank  # noqa: E402
 from eval import uplift as ev  # noqa: E402
 from experiments.run import (m4_boru_hatti, m4_duz_metrikler,  # noqa: E402
                              m4_ihlaller, _origin_blogu)
@@ -50,9 +50,9 @@ from scripts.verify_m2 import kod_metni  # noqa: E402
 from sim.response import (TEKLIF_YOK_KOLU,  # noqa: E402
                           beklenen_miktar_carpani)
 
-KOK = Path(__file__).resolve().parent.parent
-SEKIL_DIZINI = KOK / "reports" / "figures" / "m4"
-GECICI = KOK / "experiments" / "runs" / "_dogrulama_m4"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SEKIL_DIZINI = REPO_ROOT / "reports" / "figures" / "m4"
+GECICI = REPO_ROOT / "experiments" / "runs" / "_dogrulama_m4"
 
 # --- CIKIS KRITERI ESIKLERI. Tuning knob'u DEGIL, kriterin kendisi. ---
 # Gercek CATE'in (en iyi kol, olasilik olceginde) asgari sapmasi. Altina
@@ -99,7 +99,7 @@ def kontrol_tepki_sizintisi() -> Kontrol:
     """
     bulgular = []
     for dizin in TARANAN_DIZINLER:
-        for yol in sorted((KOK / dizin).glob("*.py")):
+        for yol in sorted((REPO_ROOT / dizin).glob("*.py")):
             kod = kod_metni(yol)
             bulgular += [f"{dizin}/{yol.name}:{k}" for k in YASAK_TEPKI_ADLARI
                          if k in kod]
@@ -115,12 +115,12 @@ def kontrol_point_in_time(kosu_adi: str, cfg: Config) -> Kontrol:
     dunya = pol.dunya_yukle(kaynak, cfg)
     kesme = dunya.W // 2
 
-    hedef = Kosu("kesilmis", kok=GECICI).hazirla()
-    for tablo in kaynak.tablolar():
+    hedef = Run("kesilmis", kok=GECICI).prepare()
+    for tablo in kaynak.tables():
         df = kaynak.tablo(tablo)
         if "hafta" in df.columns:
             df = df.filter(pl.col("hafta") <= kesme)
-        hedef.yaz_gozlemlenebilir(tablo, df)
+        hedef.write_observable(tablo, df)
     kesik_kaynak = GozlemlenebilirKaynak("kesilmis", kok=GECICI)
     kesik = pol.dunya_yukle(kesik_kaynak, cfg)
 
@@ -182,7 +182,7 @@ def kontrol_aksiyon_uzayi(cfg: Config, c) -> Kontrol:
 
 def kontrol_determinizm(cfg: Config, kosu_adi: str) -> Kontrol:
     def _ozet():
-        c = m4_boru_hatti(cfg, kosu_adi, VERI_DIZINI)
+        c = m4_boru_hatti(cfg, kosu_adi, DATA_DIR)
         d = m4_duz_metrikler(c, cfg)
         return (round(d["m4.marj_farki_tl"], 6),
                 round(d["m4.uplift_x.artimsal_marj"], 6),
@@ -433,14 +433,14 @@ def main() -> None:
                     help="point-in-time ve determinizm kontrollerini atla")
     args = ap.parse_args()
 
-    kosu = Kosu(args.kosu)
-    manifest = kosu.manifest_oku()
+    kosu = Run(args.kosu)
+    manifest = kosu.read_manifest()
     profil = args.profil or manifest["profil"]
-    cfg = config_yukle(profil)
+    cfg = load_config(profil)
     print(f"kosu={args.kosu} profil={profil} dunya_config_hash={manifest['config_hash']} "
           f"m4_config_hash={cfg.hash()}")
 
-    c = m4_boru_hatti(cfg, args.kosu, VERI_DIZINI)
+    c = m4_boru_hatti(cfg, args.kosu, DATA_DIR)
     d = m4_duz_metrikler(c, cfg)
     # Grafikler icin CATE tahminleri (boru hatti bunlari saklamiyor).
     c.carpan = beklenen_miktar_carpani(cfg)

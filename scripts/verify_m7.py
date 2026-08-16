@@ -49,15 +49,15 @@ import polars as pl  # noqa: E402
 from agent import narrative as nv  # noqa: E402
 from agent import scenario as sc  # noqa: E402
 from agent import tools as at  # noqa: E402
-from core.config import Config, config_yukle  # noqa: E402
-from core.io import VERI_DIZINI, Kosu  # noqa: E402
+from core.config import Config, load_config  # noqa: E402
+from core.io import DATA_DIR, Run  # noqa: E402
 from experiments.run import m4_boru_hatti  # noqa: E402
 from harness import denetim as dn  # noqa: E402
 from harness import run as hr  # noqa: E402
 from scripts.verify_m2 import kod_metni  # noqa: E402
 
-KOK = Path(__file__).resolve().parent.parent
-SEKIL_DIZINI = KOK / "reports" / "figures" / "m7"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SEKIL_DIZINI = REPO_ROOT / "reports" / "figures" / "m7"
 
 # --- CIKIS KRITERI ESIKLERI. Tuning knob'u DEGIL, kriterin kendisi. ---
 # Sert rejimin taban rejimden ayrismasi icin gereken ASGARI kol degisimi
@@ -123,7 +123,7 @@ def kontrol_d8_siniri() -> Kontrol:
     """
     bulunan = []
     for dosya in AJAN_SALT_OKUR:
-        metin = kod_metni(KOK / dosya)
+        metin = kod_metni(REPO_ROOT / dosya)
         bulunan += [f"{dosya}:{ad}" for ad in YASAK_KARAR_ADLARI if ad in metin]
         bulunan += [f"{dosya}:{ad}" for ad in YASAK_KARAR_IMPORTLARI if ad in metin]
     return Kontrol(
@@ -146,7 +146,7 @@ def kontrol_ajan_sizintisi() -> Kontrol:
                                        "harness/mutasyon.py"]
     bulunan = []
     for dosya in dosyalar:
-        metin = kod_metni(KOK / dosya)
+        metin = kod_metni(REPO_ROOT / dosya)
         bulunan += [f"{dosya}:{ad}" for ad in YASAK_TEPKI_ADLARI if ad in metin]
     return Kontrol(
         ad="ajan/harness katmani gercek tepkiyi/oracle'i okumuyor",
@@ -173,7 +173,7 @@ def kontrol_dunya_degismedi(cfg: Config, manifest: dict) -> Kontrol:
     # Oynatma miktarlari ONEMSIZ: sorulan sey "bu knob dunyaya dokunuyor
     # mu", "ne kadar dokunuyor" degil. Her uc knob'in da sifirdan farkli
     # bicimde degismesi yeterli, o yuzden config'e cikarilmadi.
-    oynatilmis = config_yukle(cfg.profil.ad, gecersiz_kilma={
+    oynatilmis = load_config(cfg.profil.ad, gecersiz_kilma={
         "senaryo.ikame_ufku_hafta": cfg.senaryo.ikame_ufku_hafta * 2,
         "ajan.brifing_teklif_sayisi": cfg.ajan.brifing_teklif_sayisi + 1,
         "harness.mutasyon_sapmasi": cfg.harness.mutasyon_sapmasi + OYNATMA_SAPMASI,
@@ -520,16 +520,16 @@ def main() -> None:
     ap.add_argument("--hizli", action="store_true", help="determinizm kontrolunu atla")
     args = ap.parse_args()
 
-    manifest = Kosu(args.kosu).manifest_oku()
+    manifest = Run(args.kosu).read_manifest()
     profil = args.profil or manifest["profil"]
-    cfg = config_yukle(profil)
+    cfg = load_config(profil)
     print(f"kosu={args.kosu} profil={profil} "
           f"dunya_config_hash={manifest['config_hash']} m7_config_hash={cfg.hash()}")
 
-    m4 = m4_boru_hatti(cfg, args.kosu, VERI_DIZINI)
+    m4 = m4_boru_hatti(cfg, args.kosu, DATA_DIR)
     print(f"M4 yeniden kullanildi: olcum origin={m4.olcum_originleri}")
 
-    hb = hr.baglam_hazirla(cfg, args.kosu, VERI_DIZINI, m4=m4)
+    hb = hr.baglam_hazirla(cfg, args.kosu, DATA_DIR, m4=m4)
     kosu = hb.kosu
     print(f"\nM7 senaryo: origin={kosu.t} politika={kosu.politika} "
           f"taban={kosu.taban_ad} rejimler={kosu.rejim_adlari}")

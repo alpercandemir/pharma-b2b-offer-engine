@@ -46,9 +46,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
 
-from core.config import Config, config_yukle  # noqa: E402
-from core.io import VERI_DIZINI, Kosu  # noqa: E402
-from core.rng import SeedBankasi  # noqa: E402
+from core.config import Config, load_config  # noqa: E402
+from core.io import DATA_DIR, Run  # noqa: E402
+from core.rng import SeedBank  # noqa: E402
 from eval import ope as ev_ope  # noqa: E402
 from eval import report as ev_rapor  # noqa: E402
 from experiments.run import (m4_boru_hatti, m6_boru_hatti,  # noqa: E402
@@ -56,8 +56,8 @@ from experiments.run import (m4_boru_hatti, m6_boru_hatti,  # noqa: E402
 from scripts.verify_m2 import kod_metni  # noqa: E402
 from sim.world import dunya_kur, hafta_adimi  # noqa: E402
 
-KOK = Path(__file__).resolve().parent.parent
-SEKIL_DIZINI = KOK / "reports" / "figures" / "m6"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SEKIL_DIZINI = REPO_ROOT / "reports" / "figures" / "m6"
 
 # --- CIKIS KRITERI ESIKLERI. Tuning knob'u DEGIL, kriterin kendisi. ---
 # Ozdeslik testi: hedef = kayit politikasi iken IPS ile oracle arasindaki
@@ -112,7 +112,7 @@ def kontrol_ope_sizintisi() -> Kontrol:
     Tahminci dosyasi oracle'a bir kez bakarsa iddia coker; bu yuzden kontrol
     yorum satirina degil KAYNAK TARAMASINA bagli.
     """
-    metin = kod_metni(KOK / "eval" / "ope.py")
+    metin = kod_metni(REPO_ROOT / "eval" / "ope.py")
     bulunan = [a for a in YASAK_TEPKI_ADLARI if a in metin]
     return Kontrol(
         ad="eval/ope.py gercek tepkiyi/oracle'i okumuyor",
@@ -165,10 +165,10 @@ def kontrol_isinma_sadakati(cfg: Config, kosu: str) -> Kontrol:
     -- ve eczane stogu / SOW / depo stogunu TAMSAYI olarak karsilastirir.
     """
     b = cfg.ope.rollout.baslangic_hafta
-    durum_a = dunya_kur(cfg, SeedBankasi(cfg.profil.temel_seed))
+    durum_a = dunya_kur(cfg, SeedBank(cfg.profil.temel_seed))
     for _ in range(b):
         hafta_adimi(durum_a)
-    durum_b = dunya_kur(cfg, SeedBankasi(cfg.profil.temel_seed))
+    durum_b = dunya_kur(cfg, SeedBank(cfg.profil.temel_seed))
     for _ in range(b):
         hafta_adimi(durum_b)
 
@@ -193,7 +193,7 @@ def kontrol_determinizm(cfg: Config, kosu: str) -> Kontrol:
     M6 en cok rassal katman: kayit tekrarlari, kabul zarlari, rollout
     haftalari. Tekrar uretilemezse hicbir sapma yorumu kalici degildir.
     """
-    m4 = m4_boru_hatti(cfg, kosu, VERI_DIZINI)
+    m4 = m4_boru_hatti(cfg, kosu, DATA_DIR)
     a = m6_duz_metrikler(m6_boru_hatti(cfg, m4), cfg)
     b = m6_duz_metrikler(m6_boru_hatti(cfg, m4), cfg)
     farkli = [k for k in a
@@ -296,7 +296,7 @@ def kontrol_propensity_bozmasi(cfg: Config, kosu: str, m4) -> Kontrol:
     duzlestirmede KUCULUR, agirlik BUYUR ve tahmin YUKARI kayar. Kontrol bu
     yuzden sabit bir yon degil, satir bazinda olculen yonu sinar.
     """
-    bozuk = config_yukle(cfg.profil.ad, gecersiz_kilma={
+    bozuk = load_config(cfg.profil.ad, gecersiz_kilma={
         "ope.propensity.sicaklik": BOZMA_SICAKLIGI,
         "ope.rollout.politikalar": ["teklif_yok"],
         "ope.rollout.ufuk_hafta": 1,
@@ -531,13 +531,13 @@ def main() -> None:
                     help="determinizm ve propensity bozma kontrollerini atla")
     args = ap.parse_args()
 
-    manifest = Kosu(args.kosu).manifest_oku()
+    manifest = Run(args.kosu).read_manifest()
     profil = args.profil or manifest["profil"]
-    cfg = config_yukle(profil)
+    cfg = load_config(profil)
     print(f"kosu={args.kosu} profil={profil} "
           f"dunya_config_hash={manifest['config_hash']} m6_config_hash={cfg.hash()}")
 
-    m4 = m4_boru_hatti(cfg, args.kosu, VERI_DIZINI)
+    m4 = m4_boru_hatti(cfg, args.kosu, DATA_DIR)
     print(f"M4 yeniden kullanildi: olcum origin={m4.olcum_originleri}, "
           f"{sum(b.teklifler.height for b in m4.bloklar)} vetosuz aday satiri")
 

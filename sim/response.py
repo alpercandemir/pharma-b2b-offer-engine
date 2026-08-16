@@ -51,10 +51,10 @@ import numpy as np
 import polars as pl
 
 from core.config import Config
-from core.rng import SeedBankasi
+from core.rng import SeedBank
 
-KOK = Path(__file__).resolve().parent.parent
-VERI_DIZINI = KOK / "data"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = REPO_ROOT / "data"
 
 # Sifira bolme korumasi (hiz paydasi). Sayisal sabit, knob degil.
 EPSILON = 1e-9
@@ -110,7 +110,7 @@ class GercekDurum:
     """
 
     def __init__(self, kosu_adi: str, kok: Path | None = None) -> None:
-        dizin = (kok or VERI_DIZINI) / kosu_adi / "ground_truth"
+        dizin = (kok or DATA_DIR) / kosu_adi / "ground_truth"
         h = pl.read_parquet(
             dizin / "hucre_haftalik.parquet",
             columns=["hafta", "eczane_id", "sku_id", "gercek_eczane_stogu",
@@ -175,7 +175,7 @@ class TepkiEvreni:
     dsf_z: np.ndarray               # [S]
 
 
-def tepki_evreni_kur(cfg: Config, seedler: SeedBankasi, eczaneler: pl.DataFrame,
+def tepki_evreni_kur(cfg: Config, seedler: SeedBank, eczaneler: pl.DataFrame,
                      urunler: pl.DataFrame, latent_eczane: pl.DataFrame) -> TepkiEvreni:
     """Latent duyarliliklari kurar.
 
@@ -185,7 +185,7 @@ def tepki_evreni_kur(cfg: Config, seedler: SeedBankasi, eczaneler: pl.DataFrame,
     """
     d = cfg.tepki.duyarlilik
     h = d.heterojenlik_carpani
-    rng = seedler.uretec("teklif_tepkisi")
+    rng = seedler.generator("teklif_tepkisi")
     P, S = eczaneler.height, urunler.height
 
     # Latent tablo eczane_id'ye gore hizalanir; sira varsayimi yapilmaz.
@@ -327,14 +327,14 @@ def tepki_hesapla(cfg: Config, evren: TepkiEvreni, durum: GercekDurum,
     return Tepki(olasilik=_sigmoid(logit), taban_logit=taban, ihtiyac=ihtiyac)
 
 
-def sonuc_ornekle(cfg: Config, seedler: SeedBankasi, tepki: Tepki,
+def sonuc_ornekle(cfg: Config, seedler: SeedBank, tepki: Tepki,
                   kol: np.ndarray, t: int) -> tuple[np.ndarray, np.ndarray]:
     """Gerceklesen (kabul, miktar_carpani). Origin bazli seed'li.
 
     Miktar carpani yalnizca KABUL edilen satirlarda anlamli; reddedilende 0.
     """
     n = kol.size
-    rng = seedler.uretec(f"tepki_ornekleme_{t}")
+    rng = seedler.generator(f"tepki_ornekleme_{t}")
     if n == 0:
         return np.zeros(0, dtype=np.int8), np.zeros(0)
     p = tepki.olasilik[np.arange(n), kol]

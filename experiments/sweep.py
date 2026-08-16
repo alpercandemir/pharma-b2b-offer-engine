@@ -35,7 +35,7 @@ import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
 from threadpoolctl import threadpool_limits  # noqa: E402
 
-from core.config import config_yukle  # noqa: E402
+from core.config import load_config  # noqa: E402
 from experiments.run import (ASAMALAR, KOSU_DIZINI, deger_coz,  # noqa: E402
                              knob_ayristir, kosu_yap)
 
@@ -184,7 +184,7 @@ def _tek_kosu(gorev: tuple) -> dict:
     if knob is not None:
         gecersiz[knob] = deger_coz(str(deger))
     gecersiz["profil.temel_seed"] = seed
-    cfg = config_yukle(profil, gecersiz_kilma=gecersiz)
+    cfg = load_config(profil, gecersiz_kilma=gecersiz)
     ad = f"_sweep/{_temiz(str(deger))}_s{seed}"
     # Her surec tek is parcacigi kullanir. Aksi halde N surec x M is parcacigi
     # cekirdek sayisini asiyor ve paralellik kosuyu HIZLANDIRMAK yerine
@@ -202,7 +202,7 @@ def _temiz(metin: str) -> str:
 def tarama(profil: str, knob: str, degerler: list[str], seedler: int,
            sabit: dict, isci: int, cikti: Path,
            asamalar: tuple[str, ...]) -> pl.DataFrame:
-    temel = config_yukle(profil).profil.temel_seed
+    temel = load_config(profil).profil.temel_seed
     gorevler = [(profil, knob, d, temel + j, sabit, cikti / "_ham", asamalar)
                 for d in degerler for j in range(seedler)]
     satirlar: list[dict] = []

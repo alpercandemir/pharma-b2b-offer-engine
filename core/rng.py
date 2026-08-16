@@ -20,30 +20,30 @@ import hashlib
 import numpy as np
 
 
-class SeedBankasi:
+class SeedBank:
     def __init__(self, temel_seed: int) -> None:
         self.temel_seed = int(temel_seed)
-        self._verilen: dict[str, int] = {}
+        self._issued: dict[str, int] = {}
 
-    def tohum(self, asama: str) -> int:
-        ham = f"{self.temel_seed}|{asama}".encode("utf-8")
-        deger = int.from_bytes(hashlib.sha256(ham).digest()[:8], "big")
+    def seed_for(self, stage: str) -> int:
+        raw = f"{self.temel_seed}|{stage}".encode("utf-8")
+        value = int.from_bytes(hashlib.sha256(raw).digest()[:8], "big")
         # numpy SeedSequence 64-bit isaretsiz kabul eder.
-        self._verilen[asama] = deger
-        return deger
+        self._issued[stage] = value
+        return value
 
-    def uretec(self, asama: str) -> np.random.Generator:
-        return np.random.default_rng(self.tohum(asama))
+    def generator(self, stage: str) -> np.random.Generator:
+        return np.random.default_rng(self.seed_for(stage))
 
     @property
-    def verilen(self) -> dict[str, int]:
-        return dict(self._verilen)
+    def issued(self) -> dict[str, int]:
+        return dict(self._issued)
 
 
-def agirlikli_secim(
-    rng: np.random.Generator, secenekler: list, agirliklar: list[float], boyut: int
+def weighted_choice(
+    rng: np.random.Generator, options: list, weights: list[float], size: int
 ) -> np.ndarray:
-    p = np.asarray(agirliklar, dtype=float)
+    p = np.asarray(weights, dtype=float)
     p = p / p.sum()
-    idx = rng.choice(len(secenekler), size=boyut, p=p)
-    return np.asarray(secenekler)[idx]
+    idx = rng.choice(len(options), size=size, p=p)
+    return np.asarray(options)[idx]

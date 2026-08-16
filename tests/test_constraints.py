@@ -24,8 +24,8 @@ import numpy as np
 import polars as pl
 import pytest
 
-from core.config import config_yukle
-from core.io import Kosu
+from core.config import load_config
+from core.io import Run
 from features.okuma import GozlemlenebilirKaynak
 from policy import candidates as ad
 from policy.constraints import VETO_SEBEPLERI, kisit_uygula, oneri_listesi
@@ -37,14 +37,14 @@ VETO_RENKLERI = ("KIRMIZI", "YESIL")
 
 @pytest.fixture(scope="module")
 def dunya_kok(tmp_path_factory):
-    cfg = config_yukle("fast")
+    cfg = load_config("fast")
     kok = tmp_path_factory.mktemp("dunya")
-    dunya_yaz(cfg, Kosu("t", kok=kok))
+    dunya_yaz(cfg, Run("t", kok=kok))
     return kok
 
 
 def _kur(kok, gecersiz: dict | None = None):
-    cfg = config_yukle("fast", gecersiz_kilma=gecersiz or {})
+    cfg = load_config("fast", gecersiz_kilma=gecersiz or {})
     dunya = ad.dunya_yukle(GozlemlenebilirKaynak("t", kok=kok), cfg)
     t = ad.origin_haftalari(cfg, dunya.W)[-1]
     gor = ad.gorunum_kur(dunya, cfg, t)
@@ -102,10 +102,10 @@ def test_regulasyonu_gevseten_config_reddediliyor():
     dogrulamasina baglanir (core/config.py Config._capraz_kontrol).
     """
     with pytest.raises(ValidationError):
-        config_yukle("fast", gecersiz_kilma={
+        load_config("fast", gecersiz_kilma={
             "politika.kisit.recete_rengi_vetosu": ["YESIL"]})
     with pytest.raises(ValidationError):
-        config_yukle("fast", gecersiz_kilma={"politika.kisit.recete_rengi_vetosu": []})
+        load_config("fast", gecersiz_kilma={"politika.kisit.recete_rengi_vetosu": []})
 
 
 # --------------------------------------------------------------------------

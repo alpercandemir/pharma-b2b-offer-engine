@@ -12,22 +12,22 @@ import numpy as np
 import polars as pl
 import pytest
 
-from core.config import config_yukle
-from core.io import Kosu
+from core.config import load_config
+from core.io import Run
 from features.okuma import GozlemlenebilirKaynak
 from features.panel import izgara_kur, panel_kur
 from scripts.generate_world import dunya_yaz
 from scripts.verify_m2 import YASAK_ADLAR, kod_metni
 
-KOK = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 @pytest.fixture(scope="module")
 def kucuk_dunya(tmp_path_factory):
     """Test icin kucuk bir dunya. Kosu dizini gecici; repo veri dizini kirlenmez."""
-    cfg = config_yukle("fast")
+    cfg = load_config("fast")
     kok = tmp_path_factory.mktemp("dunya")
-    dunya_yaz(cfg, Kosu("t", kok=kok))
+    dunya_yaz(cfg, Run("t", kok=kok))
     return cfg, kok
 
 
@@ -39,7 +39,7 @@ def test_feature_katmani_ground_truth_okumuyor():
     """
     bulgular = []
     for dizin in ("features", "models"):
-        for yol in sorted((KOK / dizin).glob("*.py")):
+        for yol in sorted((REPO_ROOT / dizin).glob("*.py")):
             kod = kod_metni(yol)
             bulgular += [f"{yol.name}:{k}" for k in YASAK_ADLAR if k in kod]
     assert not bulgular, f"feature/model katmani ground_truth'a dokunuyor: {bulgular}"
@@ -48,8 +48,8 @@ def test_feature_katmani_ground_truth_okumuyor():
 def test_kaynak_ground_truth_tablosunu_acmiyor(kucuk_dunya):
     _, kok = kucuk_dunya
     kaynak = GozlemlenebilirKaynak("t", kok=kok)
-    assert "siparisler" in kaynak.tablolar()
-    assert "hucre_haftalik" not in kaynak.tablolar()
+    assert "siparisler" in kaynak.tables()
+    assert "hucre_haftalik" not in kaynak.tables()
     with pytest.raises(FileNotFoundError):
         kaynak.tablo("hucre_haftalik")
     with pytest.raises(ValueError):
@@ -65,12 +65,12 @@ def test_point_in_time_gelecek_silinince_ozellikler_degismiyor(kucuk_dunya, tmp_
     originler = np.array([kesme - 6, kesme - 2, kesme])
     tam = panel_kur(izg, cfg, originler)
 
-    kesik_kosu = Kosu("kesik", kok=tmp_path).hazirla()
-    for ad in kaynak.tablolar():
+    kesik_kosu = Run("kesik", kok=tmp_path).prepare()
+    for ad in kaynak.tables():
         df = kaynak.tablo(ad)
         if "hafta" in df.columns:
             df = df.filter(pl.col("hafta") <= kesme)
-        kesik_kosu.yaz_gozlemlenebilir(ad, df)
+        kesik_kosu.write_observable(ad, df)
     kesik = panel_kur(izgara_kur(GozlemlenebilirKaynak("kesik", kok=tmp_path), cfg),
                       cfg, originler)
 
@@ -150,7 +150,7 @@ def test_defter_orani_gozlenen_pay_telafisinden_bagimsiz(kucuk_dunya):
     _, kok = kucuk_dunya
     ozellikler = {}
     for pay in (1.0, 0.4):
-        cfg = config_yukle("fast",
+        cfg = load_config("fast",
                            gecersiz_kilma={"feature.stok.varsayilan_gozlenen_pay": pay})
         panel = panel_kur(izgara_kur(GozlemlenebilirKaynak("t", kok=kok), cfg), cfg)
         ad = panel.ozellik_adlari

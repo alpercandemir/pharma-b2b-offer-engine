@@ -34,8 +34,8 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-KOK = Path(__file__).resolve().parent.parent
-VERI_DIZINI = KOK / "data"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = REPO_ROOT / "data"
 
 # Cesit bayragi ile stok kaydi arasindaki bir haftalik kayit gecikmesi
 # (sim/world.py: cesit haftanin basinda, stok haftanin sonunda yazilir).
@@ -86,7 +86,7 @@ class Oracle:
     """
 
     def __init__(self, kosu_adi: str, kok: Path | None = None) -> None:
-        dizin = (kok or VERI_DIZINI) / kosu_adi / "ground_truth"
+        dizin = (kok or DATA_DIR) / kosu_adi / "ground_truth"
         self.hucre = pl.read_parquet(dizin / "hucre_haftalik.parquet")
         self._matrisler: tuple | None = None
 

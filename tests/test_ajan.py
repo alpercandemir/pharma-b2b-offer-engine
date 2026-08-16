@@ -24,14 +24,14 @@ from agent import client as ac
 from agent import scenario as sc
 from agent import narrative as nv
 from agent import tools as at
-from core.config import config_yukle
+from core.config import load_config
 
 PROFIL = "fast"
 
 
 @pytest.fixture(scope="module")
 def cfg():
-    return config_yukle(PROFIL)
+    return load_config(PROFIL)
 
 
 def _teklif(rejim: str, sku: str, lot: str, **ustune) -> dict:

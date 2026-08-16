@@ -21,7 +21,7 @@ import polars as pl
 import pytest
 from pydantic import ValidationError
 
-from core.config import config_yukle
+from core.config import load_config
 from eval import allocation as ev
 from policy import allocate as alloc
 from policy import scorer
@@ -32,7 +32,7 @@ PROFIL = "fast"
 
 @pytest.fixture(scope="module")
 def cfg():
-    return config_yukle(PROFIL)
+    return load_config(PROFIL)
 
 
 # --------------------------------------------------------------------------
@@ -67,7 +67,7 @@ def test_salvage_isaret_esigi_kapali_form(cfg):
 @pytest.mark.parametrize("egri", ["lineer", "eksponansiyel", "basamakli"])
 def test_salvage_egri_tipleri_uc_noktalarda_ayni(cfg, egri):
     """Egri tipi ARADAKI yolu degistirir, uc noktalari degil."""
-    alt_cfg = config_yukle(PROFIL, gecersiz_kilma={"tahsis.temizlik.deger_egrisi": egri})
+    alt_cfg = load_config(PROFIL, gecersiz_kilma={"tahsis.temizlik.deger_egrisi": egri})
     t = alt_cfg.tahsis.temizlik
     dsf, marj = np.full(2, 100.0), np.full(2, 0.05)
     normal, v = alloc.salvage_degeri(alt_cfg, dsf, marj,
@@ -113,26 +113,26 @@ def test_kuplaj_hizla_olcekleniyor(cfg):
 # --------------------------------------------------------------------------
 def test_temizlik_rejimi_sikilastirma_olamaz():
     """D9: temizlik bir GEVSETMEDIR. Normal tabandan yuksek taban reddedilir."""
-    normal = config_yukle(PROFIL).politika.kisit.asgari_kalan_raf_omru_gun
+    normal = load_config(PROFIL).politika.kisit.asgari_kalan_raf_omru_gun
     with pytest.raises(ValidationError, match="gevsetme olmali"):
-        config_yukle(PROFIL, gecersiz_kilma={
+        load_config(PROFIL, gecersiz_kilma={
             "tahsis.temizlik.asgari_kalan_raf_omru_gun": normal + 1.0})
 
 
 def test_olu_temizlik_penceresi_reddediliyor():
     """Tetik gunu temizlik tabaninin altina inerse rejim OLU olur."""
     with pytest.raises(ValidationError, match="rejim olu"):
-        config_yukle(PROFIL, gecersiz_kilma={
+        load_config(PROFIL, gecersiz_kilma={
             "tahsis.temizlik.tetik_gun": 40.0,
             "tahsis.temizlik.asgari_kalan_raf_omru_gun": 45.0})
 
 
 def test_senaryo_dunyayi_degistirmiyor():
     """Senaryo kadranlari GORUNUMU degistirir, dunyayi degil (D3 disiplini)."""
-    taban = config_yukle(PROFIL)
+    taban = load_config(PROFIL)
     for knob, deger in (("tahsis.senaryo.kit_stok_carpani", 0.3),
                         ("tahsis.senaryo.miad_hizlandirma_gun", 90)):
-        alt = config_yukle(PROFIL, gecersiz_kilma={knob: deger})
+        alt = load_config(PROFIL, gecersiz_kilma={knob: deger})
         assert alt.dunya_hash() == taban.dunya_hash()
         assert alt.hash() != taban.hash()
 

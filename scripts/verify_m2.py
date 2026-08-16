@@ -30,8 +30,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
 
-from core.config import config_yukle  # noqa: E402
-from core.io import VERI_DIZINI, Kosu  # noqa: E402
+from core.config import load_config  # noqa: E402
+from core.io import DATA_DIR, Run  # noqa: E402
 from eval import metrics as mt  # noqa: E402
 from eval.oracle import Oracle  # noqa: E402
 from experiments.run import _oracle_hedefleri, boru_hatti, degerlendir  # noqa: E402
@@ -107,12 +107,12 @@ def kontrol_statik_sizinti() -> Kontrol:
 
 def _kesilmis_dunya(kaynak: GozlemlenebilirKaynak, kesme_haftasi: int) -> Path:
     """Gelecegi silinmis bir dunya kopyasi. Point-in-time testinin zemini."""
-    hedef = Kosu("kesilmis", kok=GECICI).hazirla()
-    for ad in kaynak.tablolar():
+    hedef = Run("kesilmis", kok=GECICI).prepare()
+    for ad in kaynak.tables():
         df = kaynak.tablo(ad)
         if "hafta" in df.columns:
             df = df.filter(pl.col("hafta") <= kesme_haftasi)
-        hedef.yaz_gozlemlenebilir(ad, df)
+        hedef.write_observable(ad, df)
     return GECICI
 
 
@@ -153,7 +153,7 @@ def kontrol_point_in_time(kosu_adi: str, cfg) -> Kontrol:
 def kontrol_determinizm(cfg, kosu_adi: str) -> Kontrol:
     """Ayni config + ayni dunya -> ayni model, ayni metrik."""
     def _ozet():
-        b = boru_hatti(cfg, kosu_adi, VERI_DIZINI)
+        b = boru_hatti(cfg, kosu_adi, DATA_DIR)
         m = degerlendir("hazard", b.tahminler["hazard"], b.o_test, b.y_test, cfg)
         return (round(m["auc"], 10), round(m["mae_gun"], 10), round(m["brier"], 10))
     a, b = _ozet(), _ozet()
@@ -417,14 +417,14 @@ def main() -> None:
                     help="point-in-time ve determinizm kontrollerini atla")
     args = ap.parse_args()
 
-    kosu = Kosu(args.kosu)
-    manifest = kosu.manifest_oku()
+    kosu = Run(args.kosu)
+    manifest = kosu.read_manifest()
     profil = args.profil or manifest["profil"]
-    cfg = config_yukle(profil)
+    cfg = load_config(profil)
     print(f"kosu={args.kosu} profil={profil} dunya_config_hash={manifest['config_hash']} "
           f"m2_config_hash={cfg.hash()}")
 
-    b = boru_hatti(cfg, args.kosu, VERI_DIZINI)
+    b = boru_hatti(cfg, args.kosu, DATA_DIR)
     olcumler = {ad: degerlendir(ad, t, b.o_test, b.y_test, cfg)
                 for ad, t in b.tahminler.items()}
 
