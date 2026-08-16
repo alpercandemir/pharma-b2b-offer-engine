@@ -343,7 +343,9 @@ Bu dosya referans spesifikasyondur, çalıştırılabilir bir şey değildir.
 
 - **Kalıcı kurallar:** `CLAUDE.md` — Claude Code her oturumda otomatik okur
 - **Milestone komutları:** `PROMPTS.md` — kopyala-yapıştır
-- **İnsan tarafı çalışma döngüsü ve denetim listesi:** `README.md`
+- **İnsan tarafı çalışma döngüsü ve denetim listesi:** `WORKING_GUIDE.md`
+- **Projenin tanıtımı ve çalıştırma rehberi:** `README.md` (İngilizce)
+- **İlk kez bakan için giriş:** `REHBER.md` · **veri sözlüğü:** `DATA.md`
 
 ---
 

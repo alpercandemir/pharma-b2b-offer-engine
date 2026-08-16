@@ -1,6 +1,6 @@
 # Rehber — Bu proje ne, nasıl çalıştırılır, bir teklif nasıl görülür
 
-Bu dosya `README.md`'nin yerine geçmez. `README.md` **projeyi inşa eden insan** için yazılmış bir çalışma disiplini belgesi; bu dosya ise **projeye ilk kez bakan insan** için: sistem ne yapıyor, hangi parça neden var, hangi komut ne üretiyor.
+Bu dosya `README.md`'nin yerine geçmez. `README.md` projenin İngilizce tanıtımı — ne çözdüğü, hangi komutun ne ürettiği, nelerin eksik kaldığı; `WORKING_GUIDE.md` ise **projeyi inşa eden insan** için yazılmış bir çalışma disiplini belgesi. Bu dosya ise **projeye ilk kez bakan insan** için: sistem ne yapıyor, hangi parça neden var, hangi komut ne üretiyor. Verinin kendisi — hangi tablo hangi kolonu taşıyor, gözlemlenebilir/ground truth sınırı nerede — `DATA.md`'de.
 
 Sıfırdan okunacak şekilde yazıldı. Terimler ilk geçtikleri yerde açıklanıyor.
 
