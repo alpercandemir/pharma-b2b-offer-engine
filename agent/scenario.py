@@ -93,7 +93,7 @@ GUN_ONDALIK = 1
 def rejim_config(cfg: Config, rejim: Rejim) -> Config:
     """Fonlama kanalinin rejim altindaki hali.
 
-    `config_yukle(profil, gecersiz_kilma=...)` KULLANILMAZ: cagiran taraf
+    `load_config(profil, gecersiz_kilma=...)` KULLANILMAZ: cagiran taraf
     (sweep) zaten knob gecersiz kilmis olabilir ve profili diskten yeniden
     okumak o gecersiz kilmalari sessizce silerdi. Bu yuzden dogrudan
     kopyalanir; degistirilen tek alan fonlama orani.

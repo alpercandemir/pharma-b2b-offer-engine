@@ -159,7 +159,7 @@ def test_fonlama_carpani_yalnizca_fonlamayi_oynatiyor(cfg):
 
 
 def test_rejim_config_diger_gecersiz_kilmalari_korur():
-    """`config_yukle` ile yeniden okunsaydi sweep'in knob'i silinirdi."""
+    """`load_config` ile yeniden okunsaydi sweep'in knob'i silinirdi."""
     cfg = load_config(PROFIL, gecersiz_kilma={
         "politika.kisit.eczane_haftalik_teklif_tavani": 3})
     yeni = sc.rejim_config(cfg, cfg.senaryo.rejim("sok"))

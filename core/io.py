@@ -6,7 +6,7 @@ Bu sinir yorum satiriyla degil, yazma anininda ZORLANARAK korunur:
     data/<kosu>/observable/    -> modelin gorebilecegi her sey
     data/<kosu>/ground_truth/  -> latent gercek; sadece olcum/oracle icin
 
-`yaz_gozlemlenebilir()` bilinen bir latent kolon adi gorurse yazmaz, hata
+`write_observable()` bilinen bir latent kolon adi gorurse yazmaz, hata
 firlatir. Kaza eseri sizinti bu yuzden kosuyu dusurur, sessizce gecmez.
 """
 
